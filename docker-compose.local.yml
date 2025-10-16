@@ -1,3 +1,4 @@
+# 本地测试版本，使用了代理，不应该在生产环境中使用
 version: '3.8'
 
 services:
@@ -25,8 +26,13 @@ services:
 
   # 应用服务
   app:
-    # 生产环境：从腾讯云容器镜像服务拉取镜像，这里的镜像需要使用腾讯云的镜像地址
-    image: ccr.ccs.tencentyun.com/project-ditan/ditan-backend:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - HTTP_PROXY=${HTTP_PROXY}
+        - HTTPS_PROXY=${HTTPS_PROXY}
+        - NO_PROXY=${NO_PROXY}
     container_name: ditan_backend
     restart: unless-stopped
     ports:
@@ -71,3 +77,4 @@ networks:
   ditan_network:
     name: ditan_network
     driver: bridge
+
