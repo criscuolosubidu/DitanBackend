@@ -1,0 +1,28 @@
+version: '3.8'
+
+# 开发环境 Docker Compose 配置
+# 使用方式: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      APP_DEBUG: "True"
+      LOG_LEVEL: DEBUG
+    volumes:
+      # 挂载代码目录以支持热重载
+      - .:/app
+      - /app/.venv
+      - /app/__pycache__
+    command: ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    ports:
+      - "8000:8000"
+
+  db:
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: devpassword123
+
