@@ -1,6 +1,6 @@
 [project]
 name = "ditanbackend"
-version = "0.2.0"
+version = "1.0.0"
 description = "Patient data upload backend service"
 readme = "README.md"
 requires-python = ">=3.11"
