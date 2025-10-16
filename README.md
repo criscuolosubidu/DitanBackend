@@ -319,7 +319,7 @@ docker-compose up -d
 
 ---
 
-**Version**: 0.1.0  
+**Version**: 1.0.0  
 **Python**: 3.11+  
 **Framework**: FastAPI 0.115+
 
