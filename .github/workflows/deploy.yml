@@ -27,7 +27,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Login to Tencent Container Registry
-        timeout-minutes: 10
+        timeout-minutes: 30
         run: |
           # 网络诊断
           echo "🔍 检查网络连接..."
@@ -63,7 +63,7 @@ jobs:
             .
 
       - name: Push Docker image
-        timeout-minutes: 30
+        timeout-minutes: 100
         run: |
           # 推送 latest 标签，带重试
           for i in {1..3}; do
