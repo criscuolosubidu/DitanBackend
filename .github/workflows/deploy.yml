@@ -27,10 +27,33 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Login to Tencent Container Registry
+        timeout-minutes: 10
         run: |
-          echo "${{ secrets.TCR_PASSWORD }}" | docker login ${{ env.TCR_REGISTRY }} \
-            --username=${{ secrets.TCR_USERNAME }} \
-            --password-stdin
+          # 网络诊断
+          echo "🔍 检查网络连接..."
+          ping -c 3 ccr.ccs.tencentyun.com || echo "⚠️ ICMP ping 失败（可能被防火墙阻止）"
+          curl -v --max-time 30 https://ccr.ccs.tencentyun.com/v2/ || echo "⚠️ HTTPS 连接测试失败"
+          
+          # 增加重试逻辑
+          LOGIN_SUCCESS=false
+          for i in {1..3}; do
+            echo "🔐 尝试登录腾讯云容器镜像服务 ($i/3)..."
+            if echo "${{ secrets.TCR_PASSWORD }}" | docker login ${{ env.TCR_REGISTRY }} \
+              --username=${{ secrets.TCR_USERNAME }} \
+              --password-stdin; then
+              echo "✅ 登录成功"
+              LOGIN_SUCCESS=true
+              break
+            else
+              echo "⚠️ 登录失败，等待后重试..."
+              sleep 5
+            fi
+          done
+          
+          if [ "$LOGIN_SUCCESS" != "true" ]; then
+            echo "❌ 登录失败，请检查网络连接和认证信息"
+            exit 1
+          fi
 
       - name: Build Docker image
         run: |
@@ -40,9 +63,29 @@ jobs:
             .
 
       - name: Push Docker image
+        timeout-minutes: 30
         run: |
-          docker push ${{ env.TCR_REGISTRY }}/${{ env.TCR_NAMESPACE }}/${{ env.IMAGE_NAME }}:latest
-          docker push ${{ env.TCR_REGISTRY }}/${{ env.TCR_NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          # 推送 latest 标签，带重试
+          for i in {1..3}; do
+            if docker push ${{ env.TCR_REGISTRY }}/${{ env.TCR_NAMESPACE }}/${{ env.IMAGE_NAME }}:latest; then
+              echo "✅ latest 标签推送成功"
+              break
+            else
+              echo "⚠️ latest 标签推送失败，重试 $i/3..."
+              sleep 10
+            fi
+          done
+          
+          # 推送 commit SHA 标签，带重试
+          for i in {1..3}; do
+            if docker push ${{ env.TCR_REGISTRY }}/${{ env.TCR_NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ github.sha }}; then
+              echo "✅ commit 标签推送成功"
+              break
+            else
+              echo "⚠️ commit 标签推送失败，重试 $i/3..."
+              sleep 10
+            fi
+          done
 
       - name: Image info
         run: |
@@ -101,12 +144,44 @@ jobs:
             cd ${{ secrets.PROJECT_PATH }}
             
             echo "📦 登录腾讯云容器镜像服务..."
-            echo "${{ secrets.TCR_PASSWORD }}" | sudo docker login ccr.ccs.tencentyun.com \
-              --username=${{ secrets.TCR_USERNAME }} \
-              --password-stdin
+            # 增加重试逻辑
+            LOGIN_SUCCESS=false
+            for i in {1..3}; do
+              if echo "${{ secrets.TCR_PASSWORD }}" | sudo docker login ccr.ccs.tencentyun.com \
+                --username=${{ secrets.TCR_USERNAME }} \
+                --password-stdin; then
+                echo "✅ 登录成功"
+                LOGIN_SUCCESS=true
+                break
+              else
+                echo "⚠️ 登录失败，重试 $i/3..."
+                sleep 5
+              fi
+            done
+            
+            if [ "$LOGIN_SUCCESS" != "true" ]; then
+              echo "❌ 登录失败，退出"
+              exit 1
+            fi
             
             echo "⬇️  拉取最新镜像..."
-            sudo docker pull ccr.ccs.tencentyun.com/project-ditan/ditan-backend:latest
+            # 增加拉取重试逻辑
+            PULL_SUCCESS=false
+            for i in {1..3}; do
+              if sudo docker pull ccr.ccs.tencentyun.com/project-ditan/ditan-backend:latest; then
+                echo "✅ 镜像拉取成功"
+                PULL_SUCCESS=true
+                break
+              else
+                echo "⚠️ 镜像拉取失败，重试 $i/3..."
+                sleep 10
+              fi
+            done
+            
+            if [ "$PULL_SUCCESS" != "true" ]; then
+              echo "❌ 镜像拉取失败，退出"
+              exit 1
+            fi
             
             echo "🛑 停止旧容器..."
             sudo docker-compose down
