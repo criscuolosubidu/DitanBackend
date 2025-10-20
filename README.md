@@ -51,7 +51,13 @@ DitanBackend/
 │   └── DEPLOYMENT.md            # 部署文档
 ├── logs/                        # 日志目录
 ├── scripts/
+│   ├── cicd_workflow.yml       # CI/CD 工作流配置
+│   ├── deploy.sh               # Linux/macOS 部署脚本
+│   ├── deploy.ps1              # Windows 部署脚本
+│   ├── docker_build.sh         # Docker 构建脚本
 │   ├── init_db.py              # 数据库初始化脚本
+│   ├── manage_db.sh            # Linux/macOS 数据库管理脚本
+│   ├── manage_db.ps1           # Windows 数据库管理脚本
 │   ├── run_dev.py              # 开发环境启动脚本
 │   └── run_tests.py            # 测试运行脚本
 ├── tests/
@@ -223,6 +229,79 @@ uv run pytest -v
 uv run pytest --cov=app --cov-report=html
 ```
 
+## 数据库管理
+
+### 重置数据库（清空所有数据）
+
+当数据库结构变更或需要清空测试数据时，可以使用以下脚本：
+
+**Linux/macOS:**
+```bash
+# 查看帮助
+./scripts/manage_db.sh help
+
+# 重置数据库（会提示确认）
+./scripts/manage_db.sh reset
+
+# 重启数据库
+./scripts/manage_db.sh restart
+
+# 查看数据库状态
+./scripts/manage_db.sh status
+
+# 查看数据库日志
+./scripts/manage_db.sh logs
+```
+
+**Windows:**
+```powershell
+# 查看帮助
+.\scripts\manage_db.ps1 help
+
+# 重置数据库（会提示确认）
+.\scripts\manage_db.ps1 reset
+
+# 重启数据库
+.\scripts\manage_db.ps1 restart
+
+# 查看数据库状态
+.\scripts\manage_db.ps1 status
+
+# 查看数据库日志
+.\scripts\manage_db.ps1 logs
+```
+
+### 部署时重置数据库
+
+在 CI/CD 自动部署时，如果需要重置数据库，可以在 commit message 中添加 `[reset-db]` 标记：
+
+```bash
+git commit -m "更新数据库模型 [reset-db]"
+git push
+```
+
+这样部署时会自动删除数据库 volume 并重建数据库。
+
+### 手动部署脚本
+
+**Linux/macOS:**
+```bash
+# 保留数据库数据（默认）
+./scripts/deploy.sh
+
+# 重置数据库并部署
+./scripts/deploy.sh --reset-db
+```
+
+**Windows:**
+```powershell
+# 保留数据库数据（默认）
+.\scripts\deploy.ps1
+
+# 重置数据库并部署
+.\scripts\deploy.ps1 -ResetDb
+```
+
 ## 数据验证规则
 
 ### 必填字段
@@ -248,6 +327,7 @@ uv run pytest --cov=app --cov-report=html
 
 - [API 文档](docs/API.md) - 详细的 API 接口说明
 - [部署文档](docs/DEPLOYMENT.md) - 完整的部署指南
+- [数据库管理文档](docs/DATABASE.md) - 数据库管理和维护指南
 
 ## 日志
 
