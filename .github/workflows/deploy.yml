@@ -1,4 +1,4 @@
-name: CI/CD Pipeline
+name: CI/CD Pipeline (build and deploy)
 
 on:
   push:
@@ -118,6 +118,9 @@ jobs:
           APP_DEBUG=False
           LOG_LEVEL=INFO
           LOG_FILE=logs/app.log
+          AI_API_KEY=${{ secrets.AI_API_KEY }}
+          AI_BASE_URL=${{ secrets.AI_BASE_URL }}
+          AI_MODEL_NAME=${{ secrets.AI_MODEL_NAME }}
           EOF
 
       - name: Copy files to server
@@ -184,7 +187,14 @@ jobs:
             fi
             
             echo "🛑 停止旧容器..."
-            sudo docker-compose down
+            # 检查是否需要重置数据库（通过 commit message 或环境变量）
+            if [[ "${{ github.event.head_commit.message }}" == *"[reset-db]"* ]]; then
+              echo "🗑️  检测到 [reset-db] 标记，删除数据库volume..."
+              sudo docker-compose down -v
+            else
+              echo "💾 保留数据库数据..."
+              sudo docker-compose down
+            fi
             
             echo "🚀 启动新容器..."
             sudo docker-compose up -d
