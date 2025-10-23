@@ -3,8 +3,7 @@
 """
 import re
 import time
-from typing import Dict, Any, Optional, cast, List
-from openai.types.chat import ChatCompletionMessageParam, ChatCompletionUserMessageParam
+from typing import Dict, Any, Optional
 
 from app.services.openai_client import OpenAIChatCompletion
 from app.services.prompt_templates import (
@@ -95,16 +94,11 @@ class TCMDiagnosisService:
             # 调用LLM生成病历
             start_time = time.time()
             
-            messages: List[ChatCompletionMessageParam] = [
-                cast(ChatCompletionUserMessageParam, {
-                    "role": "user",
-                    "content": final_prompt
-                })
-            ]
-            
-            medical_record = ""
-            for chunk in self.llm.stream_chat(messages=messages, temperature=0.6):
-                medical_record += chunk
+            # 直接调用非流式API
+            medical_record = self.llm.simple_chat(
+                user_message=final_prompt,
+                temperature=0.6
+            )
             
             end_time = time.time()
             duration = round(end_time - start_time, 2)
@@ -152,16 +146,11 @@ class TCMDiagnosisService:
             # 调用LLM进行判断
             start_time = time.time()
             
-            messages: List[ChatCompletionMessageParam] = [
-                cast(ChatCompletionUserMessageParam, {
-                    "role": "user",
-                    "content": prompt
-                })
-            ]
-            
-            response = ""
-            for chunk in self.llm.stream_chat(messages=messages, temperature=0.3):
-                response += chunk
+            # 直接调用非流式API
+            response = self.llm.simple_chat(
+                user_message=prompt,
+                temperature=0.3
+            )
             
             end_time = time.time()
             duration = round(end_time - start_time, 2)
@@ -215,16 +204,11 @@ class TCMDiagnosisService:
             # 调用LLM生成处方
             start_time = time.time()
             
-            messages: List[ChatCompletionMessageParam] = [
-                cast(ChatCompletionUserMessageParam, {
-                    "role": "user",
-                    "content": prompt
-                })
-            ]
-            
-            response = ""
-            for chunk in self.llm.stream_chat(messages=messages, temperature=0.3):
-                response += chunk
+            # 直接调用非流式API
+            response = self.llm.simple_chat(
+                user_message=prompt,
+                temperature=0.3
+            )
             
             end_time = time.time()
             duration = round(end_time - start_time, 2)
@@ -296,16 +280,11 @@ class TCMDiagnosisService:
             # 调用LLM生成运动处方
             start_time = time.time()
             
-            messages: List[ChatCompletionMessageParam] = [
-                cast(ChatCompletionUserMessageParam, {
-                    "role": "user",
-                    "content": prompt
-                })
-            ]
-            
-            response = ""
-            for chunk in self.llm.stream_chat(messages=messages, temperature=0.5):
-                response += chunk
+            # 直接调用非流式API
+            response = self.llm.simple_chat(
+                user_message=prompt,
+                temperature=0.5
+            )
             
             end_time = time.time()
             duration = round(end_time - start_time, 2)

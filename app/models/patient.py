@@ -2,8 +2,8 @@
 病人相关数据库模型
 """
 from datetime import datetime, date
-from typing import Optional, List
 from enum import Enum as PyEnum
+from typing import Optional, List
 
 from sqlalchemy import String, Text, DateTime, Date, Float, Integer, ForeignKey, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -13,9 +13,9 @@ from app.core.database import Base
 
 class Gender(PyEnum):
     """性别枚举"""
-    MALE = "Male"
-    FEMALE = "Female"
-    OTHER = "Other"
+    MALE = "MALE"
+    FEMALE = "FEMALE"
+    OTHER = "OTHER"
 
 
 class DiagnosisType(PyEnum):
@@ -114,7 +114,7 @@ class SanzhenAnalysisResult(Base):
     tongue_front: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     tongue_bottom: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     pulse: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    diagnosis_result: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # 综合诊断结果
+    diagnosis_result: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)  # 综合诊断结果
     
     # 关系
     pre_diagnosis: Mapped["PreDiagnosisRecord"] = relationship("PreDiagnosisRecord", back_populates="sanzhen_result")

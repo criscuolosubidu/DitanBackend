@@ -1,15 +1,32 @@
 """
 病人数据和诊断相关 API 路由
+
+工作流程说明：
+=============
+1. 预就诊阶段（在另一个系统完成）：
+   - 患者在预就诊系统完成信息采集（身高、体重、对话等）
+   - 系统生成 PreDiagnosisRecord 数据
+
+2. 预就诊记录上传（POST /medical-record）：
+   - 预就诊系统调用此接口，上传 PreDiagnosisRecord
+   - 后端根据手机号查找患者，如不存在则自动创建
+   - 创建 PatientMedicalRecord 和 PreDiagnosisRecord
+
+3. 医生诊室就诊：
+   - 患者使用二维码或输入手机号
+   - 医生调用 GET /patient/query?phone={phone} 查询患者信息和历史就诊记录
+   - 医生查看预就诊信息（PreDiagnosisRecord）
+   - 医生与患者对话，ASR实时转录
+   - 调用 POST /medical-record/{record_id}/ai-diagnosis 生成AI诊断建议
+   - 医生调整诊断，提交最终诊断（待实现）
 """
-import time
-from typing import List, Optional
 from fastapi import APIRouter, Depends, Request, Query, Path
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.database import get_db
 from app.core.config import get_settings
+from app.core.database import get_db
 from app.core.exceptions import (
     ValidationException,
     DuplicateException,
@@ -26,7 +43,6 @@ from app.models.patient import (
 )
 from app.schemas.patient import (
     QRcodeRecord,
-    PatientCreate,
     PatientResponse,
     PatientQueryResponse,
     MedicalRecordCreate,
@@ -38,7 +54,6 @@ from app.schemas.patient import (
     APIResponse,
 )
 from app.services.tcm_diagnosis_service import TCMDiagnosisService
-
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -62,6 +77,10 @@ async def query_patient_by_phone(
 ):
     """
     通过手机号查询患者信息和历史就诊记录
+    
+    **使用场景：**
+    - 医生诊室：扫描患者二维码或输入手机号后，查找患者信息和历史就诊记录
+    - 前端展示：患者列表（包括首次就诊或历史就诊）
     
     - **phone**: 患者的11位手机号
     """
@@ -124,65 +143,6 @@ async def query_patient_by_phone(
         raise DatabaseException(message=error_msg, detail=str(e))
 
 
-@router.post("/patient/register", response_model=APIResponse, status_code=201)
-async def register_patient_from_qrcode(
-    request: Request,
-    qrcode_data: QRcodeRecord,
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    从二维码数据注册新患者
-    
-    - **qrcode_data**: 二维码中的患者信息
-    """
-    endpoint = f"{request.method} {request.url.path}"
-    
-    try:
-        log_request(logger, endpoint, qrcode_data.model_dump())
-        
-        # 检查手机号是否已存在
-        result = await db.execute(
-            select(Patient).where(Patient.phone == qrcode_data.phone)
-        )
-        existing_patient = result.scalar_one_or_none()
-        
-        if existing_patient:
-            raise DuplicateException(message=f"手机号 {qrcode_data.phone} 已注册")
-        
-        # 创建患者记录
-        patient = Patient(
-            name=qrcode_data.name,
-            sex=qrcode_data.gender,
-            birthday=qrcode_data.birthday,
-            phone=qrcode_data.phone
-        )
-        
-        db.add(patient)
-        await db.commit()
-        await db.refresh(patient)
-        
-        logger.info(f"成功注册患者: patient_id={patient.patient_id}, phone={patient.phone}")
-        
-        response_data = PatientResponse.model_validate(patient)
-        response = APIResponse(
-            success=True,
-            message="患者注册成功",
-            data=response_data.model_dump()
-        )
-        
-        log_response(logger, endpoint, response.model_dump())
-        
-        return response
-        
-    except DuplicateException:
-        raise
-        
-    except Exception as e:
-        error_msg = "注册患者时发生错误"
-        log_error(logger, error_msg, e)
-        raise DatabaseException(message=error_msg, detail=str(e))
-
-
 @router.post("/medical-record", response_model=APIResponse, status_code=201)
 async def create_medical_record(
     request: Request,
@@ -190,7 +150,16 @@ async def create_medical_record(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    创建就诊记录
+    创建就诊记录（预就诊系统调用）
+    
+    **使用场景：**
+    预就诊系统完成患者信息采集后，调用此接口上传预就诊数据。
+    如果患者不存在（根据手机号判断），系统将自动创建患者记录。
+    
+    **重要说明：**
+    - 此接口由预就诊系统调用，不是医生诊室使用
+    - 患者信息（patient_info）仅在首次就诊时提供
+    - UUID由预就诊系统生成，用于幂等性控制
     
     - **record_data**: 就诊记录信息，包含患者信息和预诊记录
     """

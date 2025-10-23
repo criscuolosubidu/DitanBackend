@@ -1,20 +1,20 @@
 """
 病人数据 Pydantic 模型
 """
+import re
 from datetime import datetime, date
-from typing import Optional, List
 from enum import Enum
+from typing import Optional, List
 
 from pydantic import BaseModel, Field, field_validator
-import re
 
 
 # 枚举类型
 class Gender(str, Enum):
     """性别枚举"""
-    MALE = "Male"
-    FEMALE = "Female"
-    OTHER = "Other"
+    MALE = "MALE"
+    FEMALE = "FEMALE"
+    OTHER = "OTHER"
 
 
 class DiagnosisType(str, Enum):
