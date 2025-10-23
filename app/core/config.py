@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     LOG_FILE: str = "logs/app.log"
     
+    # AI模型配置
+    AI_API_KEY: str
+    AI_BASE_URL: str
+    AI_MODEL_NAME: str = "deepseek-chat"
+    
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

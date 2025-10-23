@@ -13,6 +13,7 @@ dependencies = [
     "pydantic-settings>=2.5.0",
     "python-dotenv>=1.0.1",
     "python-multipart>=0.0.9",
+    "openai>=2.6.0",
 ]
 
 [project.optional-dependencies]

@@ -49,6 +49,11 @@ services:
       # 日志配置
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       LOG_FILE: logs/app.log
+      
+      # AI模型配置
+      AI_API_KEY: ${AI_API_KEY}
+      AI_BASE_URL: ${AI_BASE_URL}
+      AI_MODEL_NAME: ${AI_MODEL_NAME:-deepseek-chat}
     depends_on:
       db:
         condition: service_healthy
