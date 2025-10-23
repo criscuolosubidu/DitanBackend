@@ -2,6 +2,7 @@
 环境配置模块
 """
 from functools import lru_cache
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -26,10 +27,16 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     LOG_FILE: str = "logs/app.log"
     
+    # AI模型配置
+    AI_API_KEY: str
+    AI_BASE_URL: str
+    AI_MODEL_NAME: str = "deepseek-chat"
+    
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        case_sensitive=True
+        case_sensitive=True,
+        extra='ignore'  # 忽略未定义的环境变量
     )
     
     @property

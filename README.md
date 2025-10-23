@@ -1,6 +1,6 @@
-# DitanBackend - 病人数据上传后端服务
+# DitanBackend - 中医智能诊疗系统后端
 
-一个基于 FastAPI 构建的病人数据上传后端服务，用于接收和存储患者的基本信息及四诊分析结果。
+一个基于 FastAPI 构建的中医智能诊疗系统后端服务，提供患者管理、就诊记录管理和AI辅助诊断功能。
 
 ## 特性
 
@@ -13,6 +13,9 @@
 - ✅ 使用 uv 进行依赖管理
 - ✅ 完整的单元测试
 - ✅ 交互式 API 文档（Swagger UI / ReDoc）
+- ✅ AI智能诊断（病历生成、证型判断、处方生成）
+- ✅ 个性化运动处方生成
+- ✅ 完整的就诊流程管理
 
 ## 技术栈
 
@@ -20,6 +23,7 @@
 - **数据库**: PostgreSQL
 - **ORM**: SQLAlchemy 2.0+（异步）
 - **数据验证**: Pydantic 2.9+
+- **AI引擎**: OpenAI Compatible API (DeepSeek等)
 - **日志**: Python logging
 - **包管理**: uv
 - **测试**: pytest + httpx
@@ -32,7 +36,7 @@ DitanBackend/
 │   ├── __init__.py
 │   ├── api/
 │   │   ├── __init__.py
-│   │   ├── patient.py          # 患者 API 路由
+│   │   ├── patient.py          # 患者和诊断 API 路由
 │   │   └── router.py            # 路由汇总
 │   ├── core/
 │   │   ├── __init__.py
@@ -42,10 +46,15 @@ DitanBackend/
 │   │   └── logging.py           # 日志配置
 │   ├── models/
 │   │   ├── __init__.py
-│   │   └── patient.py           # 患者数据模型
-│   └── schemas/
+│   │   └── patient.py           # 数据模型（患者、就诊、诊断等）
+│   ├── schemas/
+│   │   ├── __init__.py
+│   │   └── patient.py           # Pydantic 模型
+│   └── services/
 │       ├── __init__.py
-│       └── patient.py           # Pydantic 模型
+│       ├── openai_client.py     # OpenAI 客户端
+│       ├── prompt_templates.py  # AI Prompt 模板
+│       └── tcm_diagnosis_service.py  # 中医诊断服务
 ├── docs/
 │   ├── API.md                   # API 文档
 │   └── DEPLOYMENT.md            # 部署文档
@@ -115,21 +124,29 @@ copy .env.example .env
 cp .env.example .env
 ```
 
-编辑 `.env` 文件，配置数据库连接：
+编辑 `.env` 文件，配置数据库连接和AI服务：
 
 ```env
+# 数据库配置
 DATABASE_HOST=localhost
 DATABASE_PORT=5432
 DATABASE_USER=postgres
 DATABASE_PASSWORD=your_password
 DATABASE_NAME=ditan_db
 
+# 应用配置
 APP_HOST=0.0.0.0
 APP_PORT=8000
 APP_DEBUG=True
 
+# 日志配置
 LOG_LEVEL=INFO
 LOG_FILE=logs/app.log
+
+# AI模型配置
+AI_API_KEY=your_api_key_here
+AI_BASE_URL=https://api.deepseek.com
+AI_MODEL_NAME=deepseek-chat
 ```
 
 ### 5. 初始化数据库
@@ -165,53 +182,67 @@ uv run python main.py
 
 ## API 使用示例
 
-### 创建患者数据
+### 1. 注册患者（从二维码）
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/patient" \
+curl -X POST "http://localhost:8000/api/v1/patient/register" \
   -H "Content-Type: application/json" \
   -d '{
-    "uuid": "550e8400-e29b-41d4-a716-446655440000",
-    "phone": "13800138001",
+    "card_number": "CARD001",
     "name": "张三",
-    "sex": "男",
+    "phone": "13800138001",
+    "gender": "Male",
     "birthday": "1985-05-20",
-    "height": "175",
-    "weight": "70",
-    "analysisResults": {
-      "face": "面色略黄，唇色偏淡，有轻微黑眼圈。",
-      "tongueFront": "舌体偏胖，舌苔薄白，边有齿痕。",
-      "tongueBottom": "舌下络脉颜色正常，无明显瘀滞。",
-      "pulse": "脉象沉细，左手关脉较弱。"
-    },
-    "cozeConversationLog": "USER: 你好\nAI: 你好，请问有什么可以帮您？"
+    "target_weight": "70"
+  }'
+```
+
+### 2. 查询患者信息
+
+```bash
+curl -X GET "http://localhost:8000/api/v1/patient/query?phone=13800138001"
+```
+
+### 3. 创建就诊记录
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/medical-record" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "uuid": "550e8400-e29b-41d4-a716-446655440001",
+    "patient_phone": "13800138001",
+    "pre_diagnosis": {
+      "uuid": "660e8400-e29b-41d4-a716-446655440001",
+      "height": 175.0,
+      "weight": 80.0,
+      "sanzhen_analysis": {
+        "face": "面色略黄",
+        "tongue_front": "舌苔薄白",
+        "pulse": "脉象沉细"
+      }
+    }
+  }'
+```
+
+### 4. 生成AI诊断
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/medical-record/1/ai-diagnosis" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "asr_text": "医生：您好，请问有什么不舒服？\n患者：我最近体重增加了很多，感觉身体很沉重..."
   }'
 ```
 
 ### 响应示例
 
-```json
-{
-  "success": true,
-  "message": "患者数据上传成功",
-  "data": {
-    "uuid": "550e8400-e29b-41d4-a716-446655440000",
-    "phone": "13800138001",
-    "name": "张三",
-    "sex": "男",
-    "birthday": "1985-05-20",
-    "height": "175",
-    "weight": "70",
-    "analysis_face": "面色略黄，唇色偏淡，有轻微黑眼圈。",
-    "analysis_tongue_front": "舌体偏胖，舌苔薄白，边有齿痕。",
-    "analysis_tongue_bottom": "舌下络脉颜色正常，无明显瘀滞。",
-    "analysis_pulse": "脉象沉细，左手关脉较弱。",
-    "coze_conversation_log": "USER: 你好\nAI: 你好，请问有什么可以帮您？",
-    "created_at": "2024-01-15T10:30:00",
-    "updated_at": "2024-01-15T10:30:00"
-  }
-}
-```
+AI诊断将返回：
+- 格式化的病历
+- 证型判断（脾虚湿困型、胃热燔脾型、气滞血瘀型、脾肾阳虚型）
+- 个性化中药处方
+- 4周运动处方计划
+
+详细的API文档请查看 [API.md](docs/API.md)
 
 ## 运行测试
 
@@ -302,26 +333,46 @@ git push
 .\scripts\deploy.ps1 -ResetDb
 ```
 
-## 数据验证规则
+## 核心功能
 
-### 必填字段
+### 1. 患者管理
+- 二维码扫码注册
+- 手机号查询患者信息
+- 历史就诊记录查询
 
-- `uuid`: UUID v4 格式（例如：`550e8400-e29b-41d4-a716-446655440000`）
+### 2. 就诊流程管理
+- 创建就诊记录
+- 预诊信息记录（身高、体重、三诊分析）
+- 就诊记录状态管理
+
+### 3. AI智能诊断
+- **病历生成**: 从医患对话ASR转录文本自动生成结构化病历
+- **证型判断**: 基于中医理论智能判断证型
+  - 脾虚湿困型
+  - 胃热燔脾型
+  - 气滞血瘀型
+  - 脾肾阳虚型
+- **处方生成**: 根据证型和症状生成个性化中药处方
+- **运动处方**: 根据体质和证型生成4周运动计划
+
+### 4. 数据验证规则
+
+#### 必填字段
 - `phone`: 11位手机号，以1开头（例如：`13800138001`）
+- UUID字段: UUID v4 格式（例如：`550e8400-e29b-41d4-a716-446655440000`）
 
-### 可选字段
-
+#### 可选字段
 - `name`: 患者姓名
-- `sex`: 性别（"男" 或 "女"）
+- `sex`: 性别（"Male", "Female", "Other"）
 - `birthday`: 出生日期（格式：YYYY-MM-DD）
 - `height`: 身高（cm）
 - `weight`: 体重（kg）
-- `analysisResults`: 四诊分析结果对象
+- `sanzhen_analysis`: 三诊分析结果对象
   - `face`: 面诊结果
-  - `tongueFront`: 舌诊（正面）结果
-  - `tongueBottom`: 舌诊（舌下）结果
+  - `tongue_front`: 舌诊（正面）结果
+  - `tongue_bottom`: 舌诊（舌下）结果
   - `pulse`: 脉诊结果
-- `cozeConversationLog`: 对话记录
+  - `diagnosis_result`: 综合诊断结果
 
 ## 文档
 
