@@ -54,6 +54,9 @@ services:
       AI_API_KEY: ${AI_API_KEY}
       AI_BASE_URL: ${AI_BASE_URL}
       AI_MODEL_NAME: ${AI_MODEL_NAME:-deepseek-chat}
+      
+      # JWT
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
     depends_on:
       db:
         condition: service_healthy

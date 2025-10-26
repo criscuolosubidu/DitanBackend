@@ -210,14 +210,20 @@ jobs:
               exit 1
             fi
             
+            echo "🔍 Docker Compose 命令: $DOCKER_COMPOSE_CMD"
+            echo "📁 docker-compose.yml 内容预览:"
+            head -n 10 docker-compose.yml || echo "⚠️ 无法读取 docker-compose.yml"
+            
             # 检查是否需要重置数据库（通过 commit message 或环境变量）
             if [[ "${{ github.event.head_commit.message }}" == *"[reset-db]"* ]]; then
               echo "🗑️  检测到 [reset-db] 标记，删除数据库volume..."
-              $DOCKER_COMPOSE_CMD down -v 2>&1 || true
+              echo "执行命令: $DOCKER_COMPOSE_CMD down -v"
+              $DOCKER_COMPOSE_CMD down -v 2>&1 || echo "⚠️ down 命令执行完成（可能没有运行中的容器）"
               echo "✅ 旧容器已处理（重置数据库）"
             else
               echo "💾 保留数据库数据..."
-              $DOCKER_COMPOSE_CMD down 2>&1 || true
+              echo "执行命令: $DOCKER_COMPOSE_CMD down"
+              $DOCKER_COMPOSE_CMD down 2>&1 || echo "⚠️ down 命令执行完成（可能没有运行中的容器）"
               echo "✅ 旧容器已处理（保留数据）"
             fi
             
