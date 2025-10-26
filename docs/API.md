@@ -336,6 +336,13 @@ Authorization: Bearer <access_token>
 
 根据手机号查询患者信息和历史就诊记录。
 
+**认证**: 需要JWT令牌
+
+**请求头**
+```
+Authorization: Bearer <access_token>
+```
+
 **查询参数**
 - `phone` (必填): 患者手机号，11位数字
 
@@ -367,6 +374,7 @@ Authorization: Bearer <access_token>
 ```
 
 **错误响应**
+- 401: 未认证或令牌无效
 - 404: 患者不存在
 
 ---
@@ -440,12 +448,15 @@ Authorization: Bearer <access_token>
 
 创建新的就诊记录，包含预诊信息。
 
+**认证**: ⚠️ 不需要认证（此接口由其他系统模块调用，非医生前端调用）
+
 **使用场景：** 预就诊系统完成数据采集后，调用此接口上传预就诊记录。
 
 **核心特性：**
 - ✅ 自动创建患者：如果患者不存在（根据手机号判断），系统会自动创建
 - ✅ 幂等性保证：使用UUID避免重复创建
 - ✅ 完整数据保存：包括预诊记录、三诊分析结果等
+- ⚠️ 无需认证：供预就诊系统调用，不需要JWT令牌
 
 **请求体**
 ```json
@@ -543,6 +554,13 @@ Authorization: Bearer <access_token>
 
 获取完整的就诊记录信息，包括患者信息、预诊记录和诊断记录。
 
+**认证**: 需要JWT令牌
+
+**请求头**
+```
+Authorization: Bearer <access_token>
+```
+
 **路径参数**
 - `record_id`: 就诊记录ID
 
@@ -602,6 +620,7 @@ Authorization: Bearer <access_token>
 ```
 
 **错误响应**
+- 401: 未认证或令牌无效
 - 404: 就诊记录不存在
 
 ---
@@ -613,6 +632,13 @@ Authorization: Bearer <access_token>
 **POST** `/api/v1/medical-record/{record_id}/ai-diagnosis`
 
 为指定的就诊记录生成AI诊断，包括病历生成、证型判断、处方生成和运动处方。
+
+**认证**: 需要JWT令牌
+
+**请求头**
+```
+Authorization: Bearer <access_token>
+```
 
 **路径参数**
 - `record_id`: 就诊记录ID
@@ -657,6 +683,7 @@ Authorization: Bearer <access_token>
 4. **运动处方**: 根据证型、体质和BMI生成4周运动计划
 
 **错误响应**
+- 401: 未认证或令牌无效
 - 404: 就诊记录不存在
 - 500: AI诊断失败
 
@@ -677,6 +704,7 @@ Authorization: Bearer <access_token>
 ### 常见错误码
 
 - **400 Bad Request**: 请求参数验证失败
+- **401 Unauthorized**: 未认证或认证令牌无效
 - **404 Not Found**: 资源不存在
 - **409 Conflict**: 资源冲突（如重复创建）
 - **500 Internal Server Error**: 服务器内部错误
@@ -744,26 +772,39 @@ POST /api/v1/medical-record
 #### 阶段2：医生诊室就诊
 
 ```bash
-# 1. 扫码/输入手机号，查询患者信息和历史记录
+# 0. 医生登录（获取JWT令牌）
+POST /api/v1/doctor/login
+{
+  "username": "doctor_zhang",
+  "password": "password123"
+}
+# 响应包含 access_token，后续请求需要在请求头中携带：
+# Authorization: Bearer <access_token>
+
+# 1. 扫码/输入手机号，查询患者信息和历史记录（需要认证）
 GET /api/v1/patient/query?phone=13800138001
+Authorization: Bearer <access_token>
 
-# 2. 获取完整的预就诊信息
+# 2. 获取完整的预就诊信息（需要认证）
 GET /api/v1/medical-record/1
+Authorization: Bearer <access_token>
 
-# 3. 医患对话后，生成AI诊断
+# 3. 医患对话后，生成AI诊断（需要认证）
 POST /api/v1/medical-record/1/ai-diagnosis
+Authorization: Bearer <access_token>
 {
   "asr_text": "医生：您好，请问有什么不舒服？\n患者：我最近体重增加了很多..."
 }
 
-# 4. 查看完整就诊记录（包括AI诊断）
+# 4. 查看完整就诊记录（包括AI诊断）（需要认证）
 GET /api/v1/medical-record/1
+Authorization: Bearer <access_token>
 ```
 
 ### 2. 老患者复诊流程
 
 ```bash
-# 1. 预就诊系统上传数据（不需要提供patient_info）
+# 1. 预就诊系统上传数据（不需要提供patient_info，无需认证）
 POST /api/v1/medical-record
 {
   "uuid": "550e8400-e29b-41d4-a716-446655440002",
@@ -775,19 +816,33 @@ POST /api/v1/medical-record
   }
 }
 
-# 2. 医生端查询（会显示历史记录）
+# 2. 医生登录
+POST /api/v1/doctor/login
+{
+  "username": "doctor_zhang",
+  "password": "password123"
+}
+
+# 3. 医生端查询（会显示历史记录，需要认证）
 GET /api/v1/patient/query?phone=13800138001
+Authorization: Bearer <access_token>
 ```
 
 ---
 
 ## 注意事项
 
-1. **UUID生成**: 客户端需要生成UUID（v4格式）用于就诊记录和预诊记录
-2. **手机号格式**: 必须是11位数字，以1开头
-3. **日期格式**: 统一使用 ISO 8601 格式 (YYYY-MM-DD)
-4. **AI诊断耗时**: AI诊断通常需要10-20秒，请做好超时处理
-5. **环境变量**: 需要配置 `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL_NAME` 等环境变量
+1. **认证要求**: 
+   - 医生端的所有查询和诊断接口都需要JWT认证
+   - 医生需要先调用登录接口获取 `access_token`
+   - 在后续请求中需要在请求头携带：`Authorization: Bearer <access_token>`
+   - 预就诊系统的上传接口（`POST /medical-record`）不需要认证
+2. **令牌有效期**: JWT令牌默认有效期为24小时，过期后需要重新登录
+3. **UUID生成**: 客户端需要生成UUID（v4格式）用于就诊记录和预诊记录
+4. **手机号格式**: 必须是11位数字，以1开头
+5. **日期格式**: 统一使用 ISO 8601 格式 (YYYY-MM-DD)
+6. **AI诊断耗时**: AI诊断通常需要10-20秒，请做好超时处理
+7. **环境变量**: 需要配置 `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL_NAME`, `JWT_SECRET_KEY` 等环境变量
 
 ---
 
@@ -837,6 +892,13 @@ JWT_ACCESS_TOKEN_EXPIRE_MINUTES=1440  # 24小时
 ---
 
 ## 更新日志
+
+### v2.1.0 (2024-01-20)
+- 🔒 为患者查询、就诊记录查询和AI诊断接口添加医生认证
+- 🔒 医生端所有API接口（除预就诊上传）现在需要JWT令牌认证
+- 📝 更新API文档，明确标注哪些接口需要认证
+- ✅ 更新测试用例，支持认证测试
+- 🎯 优化工作流程说明，明确医生登录步骤
 
 ### v2.0.0 (2024-01-15)
 - 新增医生管理功能

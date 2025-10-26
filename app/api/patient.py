@@ -11,20 +11,24 @@
    - 预就诊系统调用此接口，上传 PreDiagnosisRecord
    - 后端根据手机号查找患者，如不存在则自动创建
    - 创建 PatientMedicalRecord 和 PreDiagnosisRecord
+   - **注意：此接口不需要医生认证，供其他系统模块调用**
 
-3. 医生诊室就诊：
+3. 医生诊室就诊（需要医生登录认证）：
+   - 医生首先登录系统（POST /doctor/login），获取JWT令牌
    - 患者使用二维码或输入手机号
    - 医生调用 GET /patient/query?phone={phone} 查询患者信息和历史就诊记录
    - 医生查看预就诊信息（PreDiagnosisRecord）
    - 医生与患者对话，ASR实时转录
    - 调用 POST /medical-record/{record_id}/ai-diagnosis 生成AI诊断建议
    - 医生调整诊断，提交最终诊断（待实现）
+   - **所有医生操作都需要在请求头中携带 JWT 令牌进行认证**
 """
 from fastapi import APIRouter, Depends, Request, Query, Path
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.auth import get_current_active_doctor
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.exceptions import (
@@ -40,6 +44,7 @@ from app.models.patient import (
     PreDiagnosisRecord,
     SanzhenAnalysisResult,
     AIDiagnosisRecord,
+    Doctor,
 )
 from app.schemas.patient import (
     QRcodeRecord,
@@ -74,6 +79,7 @@ async def query_patient_by_phone(
     request: Request,
     phone: str = Query(..., description="患者手机号"),
     db: AsyncSession = Depends(get_db),
+    current_doctor: Doctor = Depends(get_current_active_doctor),
 ):
     """
     通过手机号查询患者信息和历史就诊记录
@@ -83,6 +89,10 @@ async def query_patient_by_phone(
     - 前端展示：患者列表（包括首次就诊或历史就诊）
     
     - **phone**: 患者的11位手机号
+    
+    **认证：**
+    需要医生登录认证，在请求头中提供有效的JWT令牌：
+    Authorization: Bearer <access_token>
     """
     endpoint = f"{request.method} {request.url.path}"
     
@@ -162,6 +172,9 @@ async def create_medical_record(
     - UUID由预就诊系统生成，用于幂等性控制
     
     - **record_data**: 就诊记录信息，包含患者信息和预诊记录
+    
+    **认证：**
+    此接口不需要医生认证，因为它是由其他系统模块调用的。
     """
     endpoint = f"{request.method} {request.url.path}"
     
@@ -268,11 +281,16 @@ async def get_medical_record(
     request: Request,
     record_id: int = Path(..., description="就诊记录ID"),
     db: AsyncSession = Depends(get_db),
+    current_doctor: Doctor = Depends(get_current_active_doctor),
 ):
     """
     获取完整的就诊记录信息
     
     - **record_id**: 就诊记录ID
+    
+    **认证：**
+    需要医生登录认证，在请求头中提供有效的JWT令牌：
+    Authorization: Bearer <access_token>
     """
     endpoint = f"{request.method} {request.url.path}"
     
@@ -320,12 +338,17 @@ async def create_ai_diagnosis(
     record_id: int = Path(..., description="就诊记录ID"),
     diagnosis_data: AIDiagnosisCreate = ...,
     db: AsyncSession = Depends(get_db),
+    current_doctor: Doctor = Depends(get_current_active_doctor),
 ):
     """
     为就诊记录生成AI诊断
     
     - **record_id**: 就诊记录ID
     - **diagnosis_data**: 包含ASR转录文本的诊断请求数据
+    
+    **认证：**
+    需要医生登录认证，在请求头中提供有效的JWT令牌：
+    Authorization: Bearer <access_token>
     """
     endpoint = f"{request.method} {request.url.path}"
     
