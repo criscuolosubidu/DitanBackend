@@ -1,309 +1,359 @@
-# 数据库管理指南
+# 数据库管理文档
 
-本文档介绍如何管理 DitanBackend 项目的数据库，包括重置、备份和常见问题处理。
+## 数据库结构
 
-## 目录
+### 核心实体
 
-- [数据库架构](#数据库架构)
-- [数据库管理脚本](#数据库管理脚本)
-- [重置数据库](#重置数据库)
-- [CI/CD 部署时的数据库管理](#cicd-部署时的数据库管理)
-- [常见问题](#常见问题)
+#### 1. Doctor（医生）
+医生用户实体，用于系统登录和诊断管理。
 
-## 数据库架构
+**字段说明：**
+- `doctor_id`: 医生ID（主键）
+- `username`: 用户名（唯一，用于登录）
+- `password_hash`: 密码哈希（使用bcrypt加密）
+- `name`: 医生姓名
+- `gender`: 性别（MALE/FEMALE/OTHER）
+- `phone`: 手机号（唯一）
+- `department`: 科室（可选）
+- `position`: 职位（可选）
+- `bio`: 个人简介（可选）
+- `created_at`: 创建时间
+- `updated_at`: 更新时间
+- `last_login`: 最后登录时间
 
-- **数据库类型**: PostgreSQL
-- **数据持久化**: Docker Volume (`ditan_postgres_data`)
-- **初始化**: 通过 `scripts/init_db.py` 创建表结构
+**关系：**
+- 一个医生可以有多个诊断记录（DoctorDiagnosisRecord）
 
-## 数据库管理脚本
+#### 2. Patient（患者）
+患者基本信息。
 
-### 1. 数据库管理工具 (manage_db)
+**字段说明：**
+- `patient_id`: 患者ID（主键）
+- `name`: 患者姓名
+- `sex`: 性别
+- `birthday`: 出生日期
+- `phone`: 手机号（唯一）
 
-提供了完整的数据库管理功能：
+**关系：**
+- 一个患者可以有多个就诊记录（PatientMedicalRecord）
+
+#### 3. PatientMedicalRecord（就诊记录）
+代表一次完整的就诊事件（聚合根）。
+
+**字段说明：**
+- `record_id`: 就诊记录ID（主键）
+- `patient_id`: 患者ID（外键）
+- `uuid`: UUID（用于幂等性控制）
+- `status`: 状态（pending/in_progress/completed）
+- `created_at`: 创建时间
+- `updated_at`: 更新时间
+
+**关系：**
+- 属于一个患者
+- 包含一个预诊记录（PreDiagnosisRecord）
+- 可以有多个诊断记录（DiagnosisRecord）
+
+#### 4. PreDiagnosisRecord（预诊记录）
+预诊阶段的数据采集记录。
+
+**字段说明：**
+- `pre_diagnosis_id`: 预诊记录ID（主键）
+- `record_id`: 就诊记录ID（外键）
+- `uuid`: UUID
+- `height`: 身高（cm）
+- `weight`: 体重（kg）
+- `coze_conversation_log`: 对话记录
+- `created_at`: 创建时间
+- `updated_at`: 更新时间
+
+**关系：**
+- 属于一个就诊记录
+- 可以有一个三诊分析结果（SanzhenAnalysisResult）
+
+#### 5. SanzhenAnalysisResult（三诊分析结果）
+面诊、舌诊、脉诊的分析结果。
+
+**字段说明：**
+- `sanzhen_id`: 三诊分析ID（主键）
+- `pre_diagnosis_id`: 预诊记录ID（外键）
+- `face`: 面诊结果
+- `tongue_front`: 舌诊正面
+- `tongue_bottom`: 舌诊舌下
+- `pulse`: 脉诊结果
+- `diagnosis_result`: 综合诊断结果
+
+#### 6. DiagnosisRecord（诊断记录基类）
+诊断记录的抽象基类，使用单表继承（STI）模式。
+
+**字段说明：**
+- `diagnosis_id`: 诊断记录ID（主键）
+- `record_id`: 就诊记录ID（外键）
+- `type`: 诊断类型（AI_DIAGNOSIS/DOCTOR_DIAGNOSIS）
+- `formatted_medical_record`: 格式化病历
+- `type_inference`: 证型推断
+- `treatment`: 治疗建议
+- `prescription`: 处方
+- `exercise_prescription`: 运动处方
+- `created_at`: 创建时间
+- `updated_at`: 更新时间
+
+#### 7. AIDiagnosisRecord（AI诊断记录）
+继承自DiagnosisRecord。
+
+**额外字段：**
+- `diagnosis_explanation`: 诊断解释
+- `response_time`: 响应时间（秒）
+- `model_name`: 模型名称
+
+#### 8. DoctorDiagnosisRecord（医生诊断记录）
+继承自DiagnosisRecord，关联到医生。
+
+**额外字段：**
+- `doctor_id`: 医生ID（外键，关联到Doctor表）
+- `comments`: 医生备注
+
+**关系：**
+- 属于一个医生
+
+## 数据库初始化
+
+### 创建数据库
+
+```sql
+CREATE DATABASE ditan_db;
+```
+
+### 初始化表结构
+
+```bash
+# 使用初始化脚本
+uv run python scripts/init_db.py
+```
+
+该脚本会自动创建所有表，包括：
+- doctors（医生表）
+- patients（患者表）
+- patient_medical_records（就诊记录表）
+- pre_diagnosis_records（预诊记录表）
+- sanzhen_analysis_results（三诊分析结果表）
+- diagnosis_records（诊断记录表）
+- ai_diagnosis_records（AI诊断记录表）
+- doctor_diagnosis_records（医生诊断记录表）
+
+## 数据库迁移
+
+### v2.0.0 迁移说明
+
+如果你从 v1.0.0 升级到 v2.0.0，需要执行以下迁移：
+
+#### 1. 添加 doctors 表
+
+```sql
+CREATE TABLE doctors (
+    doctor_id SERIAL PRIMARY KEY,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    name VARCHAR(50) NOT NULL,
+    gender VARCHAR(10) NOT NULL,
+    phone VARCHAR(11) NOT NULL UNIQUE,
+    department VARCHAR(100),
+    position VARCHAR(100),
+    bio TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_login TIMESTAMP
+);
+
+CREATE INDEX idx_doctors_username ON doctors(username);
+CREATE INDEX idx_doctors_phone ON doctors(phone);
+```
+
+#### 2. 修改 doctor_diagnosis_records 表
+
+```sql
+-- 添加外键约束到 doctors 表
+ALTER TABLE doctor_diagnosis_records 
+    ALTER COLUMN doctor_id TYPE INTEGER USING doctor_id::integer;
+
+ALTER TABLE doctor_diagnosis_records
+    ADD CONSTRAINT fk_doctor_diagnosis_doctor
+    FOREIGN KEY (doctor_id) REFERENCES doctors(doctor_id);
+
+ALTER TABLE doctor_diagnosis_records
+    ALTER COLUMN doctor_id SET NOT NULL;
+
+CREATE INDEX idx_doctor_diagnosis_records_doctor_id ON doctor_diagnosis_records(doctor_id);
+```
+
+## 数据库重置
+
+### 使用管理脚本
 
 **Linux/macOS:**
 ```bash
-./scripts/manage_db.sh [command]
-```
-
-**Windows:**
-```powershell
-.\scripts\manage_db.ps1 [command]
-```
-
-**可用命令:**
-- `reset` - 重置数据库（删除所有数据）
-- `restart` - 重启数据库容器
-- `logs` - 查看数据库日志
-- `status` - 查看数据库状态
-- `help` - 显示帮助信息
-
-### 2. 部署脚本 (deploy)
-
-用于手动部署应用，支持选择是否重置数据库：
-
-**Linux/macOS:**
-```bash
-# 正常部署（保留数据库）
-./scripts/deploy.sh
-
-# 部署并重置数据库
-./scripts/deploy.sh --reset-db
-```
-
-**Windows:**
-```powershell
-# 正常部署（保留数据库）
-.\scripts\deploy.ps1
-
-# 部署并重置数据库
-.\scripts\deploy.ps1 -ResetDb
-```
-
-## 重置数据库
-
-### 场景 1: 本地开发环境重置
-
-当你需要清空所有测试数据或数据库模型发生变更时：
-
-```bash
-# 使用数据库管理工具
 ./scripts/manage_db.sh reset
-
-# 或使用 docker-compose 命令
-docker-compose down -v
-docker-compose up -d
 ```
 
-### 场景 2: 生产/测试环境重置
+**Windows:**
+```powershell
+.\scripts\manage_db.ps1 reset
+```
 
-使用部署脚本的 `--reset-db` 参数：
+这会删除所有表并重新创建。
+
+### 手动重置
 
 ```bash
-./scripts/deploy.sh --reset-db
+# 1. 删除数据库
+psql -U postgres -c "DROP DATABASE IF EXISTS ditan_db;"
+
+# 2. 重新创建数据库
+psql -U postgres -c "CREATE DATABASE ditan_db;"
+
+# 3. 初始化表结构
+uv run python scripts/init_db.py
 ```
-
-**⚠️ 警告**: 这将删除所有数据，请谨慎操作！
-
-## CI/CD 部署时的数据库管理
-
-### 默认行为
-
-默认情况下，CI/CD 部署会**保留数据库数据**：
-
-```bash
-git commit -m "更新代码"
-git push
-# 部署时保留数据库
-```
-
-### 重置数据库
-
-如果需要在部署时重置数据库，在 commit message 中添加 `[reset-db]` 标记：
-
-```bash
-git commit -m "更新数据库模型 [reset-db]"
-git push
-# 部署时会删除数据库 volume 并重建
-```
-
-### 工作原理
-
-CI/CD 脚本会检查 commit message，如果包含 `[reset-db]` 标记，则执行：
-
-```bash
-# 停止容器并删除 volume
-docker-compose down -v
-
-# 重新启动
-docker-compose up -d
-```
-
-否则执行：
-
-```bash
-# 只停止容器，保留 volume
-docker-compose down
-
-# 重新启动
-docker-compose up -d
-```
-
-## 数据持久化
-
-### Volume 管理
-
-数据库数据存储在 Docker Volume 中：
-
-```yaml
-volumes:
-  postgres_data:
-    name: ditan_postgres_data
-```
-
-**查看 Volume:**
-```bash
-docker volume ls
-docker volume inspect ditan_postgres_data
-```
-
-**手动删除 Volume:**
-```bash
-docker-compose down
-docker volume rm ditan_postgres_data
-```
-
-### 数据库初始化流程
-
-1. 容器启动时，PostgreSQL 自动初始化
-2. 应用启动时，通过 SQLAlchemy 创建表结构：
-   ```python
-   async def init_db():
-       async with engine.begin() as conn:
-           await conn.run_sync(Base.metadata.create_all)
-   ```
 
 ## 常见问题
 
-### Q: 为什么部署后数据还在？
+### Q: 如何修改数据库结构？
 
-A: 默认情况下，Docker Volume 会持久化数据。要重置数据库，需要使用 `[reset-db]` 标记或手动删除 volume。
+A: 
+1. 修改 `app/models/patient.py` 中的模型定义
+2. 运行 `uv run python scripts/init_db.py` 重新创建表
+3. 注意：这会删除所有现有数据
 
-### Q: 如何查看数据库中的数据？
+### Q: 如何备份数据？
 
-A: 可以使用数据库客户端工具连接：
-
+A:
 ```bash
-# 获取数据库容器 IP
-docker inspect ditan_db
+# 备份数据库
+pg_dump -U postgres ditan_db > backup.sql
 
-# 使用 psql 连接
-docker exec -it ditan_db psql -U huanyu -d ditan
+# 恢复数据库
+psql -U postgres ditan_db < backup.sql
+```
 
-# 查看表
+### Q: 如何查看数据库表结构？
+
+A:
+```bash
+# 连接数据库
+psql -U postgres ditan_db
+
+# 查看所有表
 \dt
 
-# 查看数据
-SELECT * FROM patients;
+# 查看表结构
+\d doctors
+\d patients
+\d patient_medical_records
 ```
 
-### Q: 数据库初始化失败怎么办？
+### Q: 医生诊断记录如何关联医生？
 
-A: 检查日志并重建：
-
-```bash
-# 查看数据库日志
-./scripts/manage_db.sh logs
-
-# 或者
-docker-compose logs db
-
-# 重置数据库
-./scripts/manage_db.sh reset
-```
-
-### Q: 如何备份数据库？
-
-A: 使用 pg_dump：
-
-```bash
-# 备份
-docker exec ditan_db pg_dump -U huanyu ditan > backup.sql
-
-# 恢复
-docker exec -i ditan_db psql -U huanyu ditan < backup.sql
-```
-
-### Q: 本地和服务器的数据库如何同步？
-
-A: 由于目前都是测试数据，建议：
-
-1. 不要同步，各自独立
-2. 如需同步，使用 pg_dump/pg_restore
-3. 考虑使用数据迁移工具（如 Alembic）
-
-## 最佳实践
-
-### 开发环境
-
-- ✅ 经常重置数据库，保持数据干净
-- ✅ 使用脚本自动化操作
-- ✅ 提交代码前测试数据库迁移
-
-### 生产/测试环境
-
-- ✅ 谨慎使用 `[reset-db]` 标记
-- ✅ 部署前备份重要数据
-- ✅ 监控数据库日志
-- ✅ 定期清理无用数据
-
-### 未来规划
-
-当项目成熟后，建议：
-
-1. 引入数据库迁移工具（Alembic）
-2. 实现自动备份机制
-3. 区分开发/测试/生产环境的数据管理策略
-4. 添加数据库版本控制
-
-## 相关文件
-
-- `docker-compose.yml` - Docker 编排配置
-- `app/core/database.py` - 数据库连接和初始化
-- `app/models/` - 数据库模型定义
-- `scripts/init_db.py` - 数据库初始化脚本
-- `scripts/manage_db.sh` - 数据库管理脚本（Linux/macOS）
-- `scripts/manage_db.ps1` - 数据库管理脚本（Windows）
-- `scripts/deploy.sh` - 部署脚本（Linux/macOS）
-- `scripts/deploy.ps1` - 部署脚本（Windows）
-- `scripts/cicd_workflow.yml` - CI/CD 工作流配置
-
-## 技术细节
-
-### SQLAlchemy 表创建
+A: 
+DoctorDiagnosisRecord 表通过 `doctor_id` 字段关联到 Doctor 表。创建医生诊断记录时，需要提供有效的医生ID。
 
 ```python
-# app/core/database.py
-async def init_db():
-    """初始化数据库（创建所有表）"""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+# 示例：创建医生诊断记录
+doctor_diagnosis = DoctorDiagnosisRecord(
+    record_id=medical_record.record_id,
+    doctor_id=current_doctor.doctor_id,  # 从JWT令牌中获取
+    formatted_medical_record="...",
+    type_inference="脾虚湿困型",
+    prescription="...",
+    comments="患者需要注意饮食调理"
+)
 ```
 
-### Docker Volume 挂载
+## 性能优化
 
-```yaml
-# docker-compose.yml
-services:
-  db:
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+### 索引
 
-volumes:
-  postgres_data:
-    name: ditan_postgres_data
+系统已创建以下索引：
+
+**doctors 表：**
+- `idx_doctors_username`: username字段（用于登录查询）
+- `idx_doctors_phone`: phone字段（用于手机号查询）
+
+**patients 表：**
+- `idx_patients_phone`: phone字段（用于患者查询）
+
+**patient_medical_records 表：**
+- `idx_medical_records_patient_id`: patient_id字段
+- `idx_medical_records_uuid`: uuid字段
+
+**pre_diagnosis_records 表：**
+- `idx_pre_diagnosis_record_id`: record_id字段
+- `idx_pre_diagnosis_uuid`: uuid字段
+
+**sanzhen_analysis_results 表：**
+- `idx_sanzhen_pre_diagnosis_id`: pre_diagnosis_id字段
+
+**diagnosis_records 表：**
+- `idx_diagnosis_record_id`: record_id字段
+
+**doctor_diagnosis_records 表：**
+- `idx_doctor_diagnosis_records_doctor_id`: doctor_id字段（用于查询某医生的诊断记录）
+
+### 连接池配置
+
+在 `app/core/database.py` 中已配置连接池：
+
+```python
+engine = create_async_engine(
+    settings.database_url,
+    echo=settings.APP_DEBUG,
+    pool_pre_ping=True,  # 连接前先ping
+    pool_size=10,        # 连接池大小
+    max_overflow=20,     # 最大溢出连接数
+)
 ```
 
-### CI/CD 数据库重置逻辑
+## 数据库监控
 
-```bash
-# scripts/cicd_workflow.yml
-if [[ "${{ github.event.head_commit.message }}" == *"[reset-db]"* ]]; then
-  echo "🗑️  删除数据库volume..."
-  sudo docker-compose down -v
-else
-  echo "💾 保留数据库数据..."
-  sudo docker-compose down
-fi
+### 查看活动连接
+
+```sql
+SELECT * FROM pg_stat_activity WHERE datname = 'ditan_db';
 ```
 
-## 总结
+### 查看表大小
 
-- 默认保留数据库数据，适合大多数场景
-- 通过脚本或 `[reset-db]` 标记灵活控制数据库重置
-- 提供了完整的管理工具和文档
-- 未来可扩展支持数据库迁移和备份
+```sql
+SELECT 
+    tablename,
+    pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size
+FROM pg_tables
+WHERE schemaname = 'public'
+ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
+```
 
-如有问题，请查看日志或提交 Issue。
+### 查看索引使用情况
 
+```sql
+SELECT 
+    schemaname,
+    tablename,
+    indexname,
+    idx_scan,
+    idx_tup_read,
+    idx_tup_fetch
+FROM pg_stat_user_indexes
+WHERE schemaname = 'public'
+ORDER BY idx_scan DESC;
+```
+
+## 安全建议
+
+1. **密码存储**：医生密码使用 bcrypt 哈希，永远不要存储明文密码
+2. **JWT密钥**：生产环境必须修改 `JWT_SECRET_KEY` 为强随机字符串
+3. **数据库权限**：生产环境应为应用创建专用数据库用户，限制权限
+4. **备份策略**：定期备份数据库，建议每天备份一次
+
+## 相关文档
+
+- [API文档](API.md)
+- [部署文档](DEPLOYMENT.md)
+- [快速开始](../README.md)
