@@ -200,10 +200,10 @@ jobs:
             
             # 尝试使用 docker compose (V2) 或 docker-compose (V1)
             if sudo docker compose version &>/dev/null; then
-              DOCKER_COMPOSE_CMD="sudo docker compose"
+              DOCKER_COMPOSE_CMD="sudo docker compose -f docker-compose.yml -p ditan"
               echo "✅ 检测到 Docker Compose V2"
             elif sudo docker-compose version &>/dev/null; then
-              DOCKER_COMPOSE_CMD="sudo docker-compose"
+              DOCKER_COMPOSE_CMD="sudo docker-compose -f docker-compose.yml -p ditan"
               echo "✅ 检测到 Docker Compose V1"
             else
               echo "❌ 未找到 docker-compose 命令"
@@ -213,23 +213,19 @@ jobs:
             # 检查是否需要重置数据库（通过 commit message 或环境变量）
             if [[ "${{ github.event.head_commit.message }}" == *"[reset-db]"* ]]; then
               echo "🗑️  检测到 [reset-db] 标记，删除数据库volume..."
-              $DOCKER_COMPOSE_CMD down -v || {
-                echo "⚠️  停止容器时出现错误，继续执行..."
-              }
+              $DOCKER_COMPOSE_CMD down -v 2>&1 || true
+              echo "✅ 旧容器已处理（重置数据库）"
             else
               echo "💾 保留数据库数据..."
-              $DOCKER_COMPOSE_CMD down || {
-                echo "⚠️  停止容器时出现错误（可能没有运行的容器），继续执行..."
-              }
+              $DOCKER_COMPOSE_CMD down 2>&1 || true
+              echo "✅ 旧容器已处理（保留数据）"
             fi
-            
-            echo "✅ 旧容器已停止"
             
             echo "🚀 启动新容器..."
             $DOCKER_COMPOSE_CMD up -d
             
             echo "🧹 清理未使用的镜像..."
-            sudo docker image prune -af
+            sudo docker image prune -af --filter "label!=keep" 2>&1 || echo "⚠️ 镜像清理遇到问题，继续执行..."
             
             echo "⏳ 等待服务启动..."
             sleep 15
@@ -249,7 +245,8 @@ jobs:
             done
             
             echo "⚠️  健康检查未通过,请查看日志:"
-            $DOCKER_COMPOSE_CMD logs --tail=50 app
+            $DOCKER_COMPOSE_CMD logs --tail=50 app || echo "⚠️ 无法获取日志"
+            exit 1
 
       - name: Deployment result
         if: always()
