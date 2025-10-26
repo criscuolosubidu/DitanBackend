@@ -170,18 +170,54 @@ class AIDiagnosisRecord(DiagnosisRecord):
         return f"<AIDiagnosisRecord(diagnosis_id={self.diagnosis_id}, model_name={self.model_name})>"
 
 
+class Doctor(Base):
+    """医生用户实体"""
+    
+    __tablename__ = "doctors"
+    
+    doctor_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    username: Mapped[str] = mapped_column(String(50), nullable=False, unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    name: Mapped[str] = mapped_column(String(50), nullable=False)
+    gender: Mapped[Gender] = mapped_column(Enum(Gender), nullable=False)
+    phone: Mapped[str] = mapped_column(String(11), nullable=False, unique=True, index=True)
+    
+    # 可选字段
+    department: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    position: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    bio: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
+    # 时间戳
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    last_login: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    
+    # 关系
+    diagnosis_records: Mapped[List["DoctorDiagnosisRecord"]] = relationship(
+        "DoctorDiagnosisRecord",
+        back_populates="doctor",
+        cascade="all, delete-orphan"
+    )
+    
+    def __repr__(self) -> str:
+        return f"<Doctor(doctor_id={self.doctor_id}, username={self.username}, name={self.name})>"
+
+
 class DoctorDiagnosisRecord(DiagnosisRecord):
     """医生诊断记录"""
     
     __tablename__ = "doctor_diagnosis_records"
     
     diagnosis_id: Mapped[int] = mapped_column(Integer, ForeignKey("diagnosis_records.diagnosis_id"), primary_key=True)
-    doctor_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # 医生ID
+    doctor_id: Mapped[int] = mapped_column(Integer, ForeignKey("doctors.doctor_id"), nullable=False, index=True)
     comments: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # 医生备注
     
     __mapper_args__ = {
         "polymorphic_identity": DiagnosisType.DOCTOR_DIAGNOSIS
     }
+    
+    # 关系
+    doctor: Mapped["Doctor"] = relationship("Doctor", back_populates="diagnosis_records")
     
     def __repr__(self) -> str:
         return f"<DoctorDiagnosisRecord(diagnosis_id={self.diagnosis_id}, doctor_id={self.doctor_id})>"

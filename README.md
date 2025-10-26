@@ -13,6 +13,8 @@
 - ✅ 使用 uv 进行依赖管理
 - ✅ 完整的单元测试
 - ✅ 交互式 API 文档（Swagger UI / ReDoc）
+- ✅ JWT认证机制，保障系统安全
+- ✅ 医生账户管理（注册、登录、信息修改）
 - ✅ AI智能诊断（病历生成、证型判断、处方生成）
 - ✅ 个性化运动处方生成
 - ✅ 完整的就诊流程管理
@@ -23,6 +25,7 @@
 - **数据库**: PostgreSQL
 - **ORM**: SQLAlchemy 2.0+（异步）
 - **数据验证**: Pydantic 2.9+
+- **认证**: JWT（python-jose + passlib）
 - **AI引擎**: OpenAI Compatible API (DeepSeek等)
 - **日志**: Python logging
 - **包管理**: uv
@@ -36,20 +39,23 @@ DitanBackend/
 │   ├── __init__.py
 │   ├── api/
 │   │   ├── __init__.py
-│   │   ├── patient.py          # 患者和诊断 API 路由
+│   │   ├── doctor.py            # 医生管理 API 路由
+│   │   ├── patient.py           # 患者和诊断 API 路由
 │   │   └── router.py            # 路由汇总
 │   ├── core/
 │   │   ├── __init__.py
+│   │   ├── auth.py              # 认证和授权
 │   │   ├── config.py            # 配置管理
 │   │   ├── database.py          # 数据库连接
 │   │   ├── exceptions.py        # 自定义异常
 │   │   └── logging.py           # 日志配置
 │   ├── models/
 │   │   ├── __init__.py
-│   │   └── patient.py           # 数据模型（患者、就诊、诊断等）
+│   │   └── patient.py           # 数据模型（患者、医生、就诊、诊断等）
 │   ├── schemas/
 │   │   ├── __init__.py
-│   │   └── patient.py           # Pydantic 模型
+│   │   ├── doctor.py            # 医生相关 Pydantic 模型
+│   │   └── patient.py           # 患者相关 Pydantic 模型
 │   └── services/
 │       ├── __init__.py
 │       ├── openai_client.py     # OpenAI 客户端
@@ -147,6 +153,11 @@ LOG_FILE=logs/app.log
 AI_API_KEY=your_api_key_here
 AI_BASE_URL=https://api.deepseek.com
 AI_MODEL_NAME=deepseek-chat
+
+# JWT认证配置
+JWT_SECRET_KEY=your-secret-key-change-this-in-production
+JWT_ALGORITHM=HS256
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES=1440
 ```
 
 ### 5. 初始化数据库
@@ -182,7 +193,49 @@ uv run python main.py
 
 ## API 使用示例
 
-### 1. 注册患者（从二维码）
+### 1. 医生注册和登录
+
+#### 注册医生账户
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/doctor/register" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "doctor_zhang",
+    "password": "password123",
+    "name": "张医生",
+    "gender": "MALE",
+    "phone": "13800138000",
+    "department": "中医科",
+    "position": "主治医师"
+  }'
+```
+
+#### 医生登录
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/doctor/login" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "doctor_zhang",
+    "password": "password123"
+  }'
+```
+
+登录成功后会返回JWT令牌，后续需要认证的请求需要在Header中携带：
+
+```bash
+Authorization: Bearer <access_token>
+```
+
+#### 获取当前医生信息
+
+```bash
+curl -X GET "http://localhost:8000/api/v1/doctor/me" \
+  -H "Authorization: Bearer <access_token>"
+```
+
+### 2. 注册患者（从二维码）
 
 ```bash
 curl -X POST "http://localhost:8000/api/v1/patient/register" \
@@ -197,13 +250,13 @@ curl -X POST "http://localhost:8000/api/v1/patient/register" \
   }'
 ```
 
-### 2. 查询患者信息
+### 3. 查询患者信息
 
 ```bash
 curl -X GET "http://localhost:8000/api/v1/patient/query?phone=13800138001"
 ```
 
-### 3. 创建就诊记录
+### 4. 创建就诊记录
 
 ```bash
 curl -X POST "http://localhost:8000/api/v1/medical-record" \
@@ -224,7 +277,7 @@ curl -X POST "http://localhost:8000/api/v1/medical-record" \
   }'
 ```
 
-### 4. 生成AI诊断
+### 5. 生成AI诊断
 
 ```bash
 curl -X POST "http://localhost:8000/api/v1/medical-record/1/ai-diagnosis" \
@@ -335,17 +388,24 @@ git push
 
 ## 核心功能
 
-### 1. 患者管理
+### 1. 医生管理（新增）
+- 医生账户注册
+- 医生登录（JWT认证）
+- 医生信息查询和更新
+- 密码修改
+- 医生诊断记录关联
+
+### 2. 患者管理
 - 二维码扫码注册
 - 手机号查询患者信息
 - 历史就诊记录查询
 
-### 2. 就诊流程管理
+### 3. 就诊流程管理
 - 创建就诊记录
 - 预诊信息记录（身高、体重、三诊分析）
 - 就诊记录状态管理
 
-### 3. AI智能诊断
+### 4. AI智能诊断
 - **病历生成**: 从医患对话ASR转录文本自动生成结构化病历
 - **证型判断**: 基于中医理论智能判断证型
   - 脾虚湿困型
@@ -450,7 +510,7 @@ docker-compose up -d
 
 ---
 
-**Version**: 1.0.0  
+**Version**: 2.0.0  
 **Python**: 3.11+  
 **Framework**: FastAPI 0.115+
 

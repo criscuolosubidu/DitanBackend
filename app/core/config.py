@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     AI_BASE_URL: str
     AI_MODEL_NAME: str = "deepseek-chat"
     
+    # JWT认证配置
+    JWT_SECRET_KEY: str = "your-secret-key-change-this-in-production"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24小时
+    
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
