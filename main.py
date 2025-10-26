@@ -89,7 +89,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     log_error(logger, f"请求验证失败: {error_detail}")
     
     return JSONResponse(
-        status_code=status.HTTP_400_BAD_REQUEST,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         content={
             "success": False,
             "message": "请求参数验证失败",
