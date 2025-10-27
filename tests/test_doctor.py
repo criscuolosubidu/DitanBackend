@@ -299,7 +299,7 @@ class TestDoctorInfo:
         """测试未认证获取医生信息"""
         response = await client.get("/api/v1/doctor/me")
         
-        assert response.status_code == 403  # Forbidden (no authorization header)
+        assert response.status_code == 401  # Unauthorized (no authorization header)
     
     async def test_get_current_doctor_info_invalid_token(self, client: AsyncClient):
         """测试使用无效token"""
@@ -456,7 +456,7 @@ class TestPasswordChange:
             json=password_data
         )
         
-        assert response.status_code == 403  # Forbidden
+        assert response.status_code == 401  # Unauthorized
 
 
 @pytest.mark.asyncio
