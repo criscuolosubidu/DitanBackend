@@ -9,9 +9,9 @@ from unittest.mock import Mock, patch
 
 # ========== 患者查询测试 ==========
 @pytest.mark.asyncio
-async def test_query_patient_success(client: AsyncClient):
+async def test_query_patient_success(client: AsyncClient, auth_headers: dict):
     """测试成功查询患者信息"""
-    # 先创建就诊记录（会自动创建患者）
+    # 先创建就诊记录（会自动创建患者）- 此接口不需要认证
     record_data = {
         "uuid": "550e8400-e29b-41d4-a716-446655440001",
         "patient_phone": "13800138001",
@@ -31,8 +31,8 @@ async def test_query_patient_success(client: AsyncClient):
     create_response = await client.post("/api/v1/medical-record", json=record_data)
     assert create_response.status_code == 201
     
-    # 查询患者
-    response = await client.get("/api/v1/patient/query?phone=13800138001")
+    # 查询患者 - 需要认证
+    response = await client.get("/api/v1/patient/query?phone=13800138001", headers=auth_headers)
     
     assert response.status_code == 200
     data = response.json()
@@ -44,14 +44,22 @@ async def test_query_patient_success(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_query_patient_not_found(client: AsyncClient):
+async def test_query_patient_not_found(client: AsyncClient, auth_headers: dict):
     """测试查询不存在的患者"""
-    response = await client.get("/api/v1/patient/query?phone=13800138999")
+    response = await client.get("/api/v1/patient/query?phone=13800138999", headers=auth_headers)
     
     assert response.status_code == 404
     data = response.json()
     assert data["success"] is False
     assert "未找到" in data["message"]
+
+
+@pytest.mark.asyncio
+async def test_query_patient_unauthorized(client: AsyncClient):
+    """测试未认证访问患者查询接口"""
+    response = await client.get("/api/v1/patient/query?phone=13800138001")
+    
+    assert response.status_code == 401
 
 
 # ========== 创建就诊记录测试 ==========
@@ -166,9 +174,9 @@ async def test_create_medical_record_duplicate_uuid(client: AsyncClient):
 
 # ========== 查询就诊记录测试 ==========
 @pytest.mark.asyncio
-async def test_get_medical_record_success(client: AsyncClient):
+async def test_get_medical_record_success(client: AsyncClient, auth_headers: dict):
     """测试成功查询就诊记录"""
-    # 先创建就诊记录
+    # 先创建就诊记录 - 此接口不需要认证
     record_data = {
         "uuid": "550e8400-e29b-41d4-a716-446655440014",
         "patient_phone": "13800138013",
@@ -189,8 +197,8 @@ async def test_get_medical_record_success(client: AsyncClient):
     assert create_response.status_code == 201
     record_id = create_response.json()["data"]["record_id"]
     
-    # 查询就诊记录
-    response = await client.get(f"/api/v1/medical-record/{record_id}")
+    # 查询就诊记录 - 需要认证
+    response = await client.get(f"/api/v1/medical-record/{record_id}", headers=auth_headers)
     
     assert response.status_code == 200
     data = response.json()
@@ -201,20 +209,28 @@ async def test_get_medical_record_success(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_get_medical_record_not_found(client: AsyncClient):
+async def test_get_medical_record_not_found(client: AsyncClient, auth_headers: dict):
     """测试查询不存在的就诊记录"""
-    response = await client.get("/api/v1/medical-record/99999")
+    response = await client.get("/api/v1/medical-record/99999", headers=auth_headers)
     
     assert response.status_code == 404
     data = response.json()
     assert data["success"] is False
 
 
+@pytest.mark.asyncio
+async def test_get_medical_record_unauthorized(client: AsyncClient):
+    """测试未认证访问就诊记录"""
+    response = await client.get("/api/v1/medical-record/1")
+    
+    assert response.status_code == 401
+
+
 # ========== AI诊断测试 ==========
 @pytest.mark.asyncio
-async def test_create_ai_diagnosis_success(client: AsyncClient):
+async def test_create_ai_diagnosis_success(client: AsyncClient, auth_headers: dict):
     """测试成功创建AI诊断"""
-    # 先创建就诊记录
+    # 先创建就诊记录 - 此接口不需要认证
     record_data = {
         "uuid": "550e8400-e29b-41d4-a716-446655440015",
         "patient_phone": "13800138014",
@@ -259,14 +275,15 @@ async def test_create_ai_diagnosis_success(client: AsyncClient):
         mock_instance.process_complete_diagnosis.return_value = mock_diagnosis_result
         mock_service.return_value = mock_instance
         
-        # 创建AI诊断
+        # 创建AI诊断 - 需要认证
         diagnosis_data = {
             "asr_text": "医生：您好，请问有什么不舒服？\n患者：我最近体重增加了很多..."
         }
         
         response = await client.post(
             f"/api/v1/medical-record/{record_id}/ai-diagnosis",
-            json=diagnosis_data
+            json=diagnosis_data,
+            headers=auth_headers
         )
         
         assert response.status_code == 201
@@ -278,7 +295,7 @@ async def test_create_ai_diagnosis_success(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_create_ai_diagnosis_record_not_found(client: AsyncClient):
+async def test_create_ai_diagnosis_record_not_found(client: AsyncClient, auth_headers: dict):
     """测试为不存在的就诊记录创建AI诊断"""
     diagnosis_data = {
         "asr_text": "测试对话内容..."
@@ -286,10 +303,26 @@ async def test_create_ai_diagnosis_record_not_found(client: AsyncClient):
     
     response = await client.post(
         "/api/v1/medical-record/99999/ai-diagnosis",
-        json=diagnosis_data
+        json=diagnosis_data,
+        headers=auth_headers
     )
     
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_create_ai_diagnosis_unauthorized(client: AsyncClient):
+    """测试未认证访问AI诊断接口"""
+    diagnosis_data = {
+        "asr_text": "测试对话内容..."
+    }
+    
+    response = await client.post(
+        "/api/v1/medical-record/1/ai-diagnosis",
+        json=diagnosis_data
+    )
+    
+    assert response.status_code == 401
 
 
 # ========== 健康检查测试 ==========

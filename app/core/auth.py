@@ -21,8 +21,8 @@ settings = get_settings()
 # 密码加密上下文
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# HTTP Bearer 认证
-security = HTTPBearer()
+# HTTP Bearer 认证（设置 auto_error=False 以手动处理认证错误）
+security = HTTPBearer(auto_error=False)
 
 
 def hash_password(password: str) -> str:
@@ -83,10 +83,18 @@ def decode_access_token(token: str) -> TokenData:
 
 
 async def get_current_doctor(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: AsyncSession = Depends(get_db)
 ) -> Doctor:
     """获取当前登录的医生"""
+    # 检查是否提供了认证凭证
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="未提供认证凭证",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
     token = credentials.credentials
     token_data = decode_access_token(token)
     
