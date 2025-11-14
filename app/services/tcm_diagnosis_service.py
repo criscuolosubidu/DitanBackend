@@ -75,13 +75,13 @@ class TCMDiagnosisService:
             return think
         return None
     
-    def generate_medical_record_from_transcript(self, transcript: str) -> Dict[str, Any]:
+    def generate_medical_record_from_transcript_and_coze_conversation(self, transcript: str, coze_conversation_log:str) -> Dict[str, Any]:
         """
-        从对话转录文本生成病历
+        从预问诊和对话转录文本生成病历
         
         Args:
             transcript (str): 对话转录文本
-            
+            coze_conversation_log(Dict[str, Any]): AI预问诊对话记录，需要拼接。
         Returns:
             Dict[str, Any]: 包含病历内容和状态的字典
         """
@@ -89,7 +89,7 @@ class TCMDiagnosisService:
             logger.info("开始生成病历...")
             
             # 构建最终的prompt
-            final_prompt = MEDICAL_RECORD_PROMPT_TEMPLATE.format(transcript=transcript)
+            final_prompt = MEDICAL_RECORD_PROMPT_TEMPLATE.format(transcript=transcript, log_string=coze_conversation_log)
             
             # 调用LLM生成病历
             start_time = time.time()
@@ -319,7 +319,8 @@ class TCMDiagnosisService:
         self,
         transcript: str,
         height: Optional[float] = None,
-        weight: Optional[float] = None
+        weight: Optional[float] = None,
+        coze_conversation_log: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         处理完整的诊断流程
@@ -328,7 +329,7 @@ class TCMDiagnosisService:
             transcript (str): 对话转录文本
             height (Optional[float]): 身高(cm)
             weight (Optional[float]): 体重(kg)
-            
+            coze_conversation_log (Optional[str]):数字人的对话日志。
         Returns:
             Dict[str, Any]: 包含完整处理结果的字典
         """
@@ -338,7 +339,7 @@ class TCMDiagnosisService:
         
         # 1. 生成病历
         logger.info("[1/4] 生成病历")
-        medical_result = self.generate_medical_record_from_transcript(transcript)
+        medical_result = self.generate_medical_record_from_transcript_and_coze_conversation(transcript,coze_conversation_log)
         if medical_result["status"] != "success":
             logger.error("病历生成失败")
             return {
