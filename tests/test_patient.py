@@ -295,6 +295,165 @@ async def test_create_ai_diagnosis_success(client: AsyncClient, auth_headers: di
 
 
 @pytest.mark.asyncio
+async def test_create_ai_diagnosis_with_coze_conversation_log(client: AsyncClient, auth_headers: dict):
+    """测试带有coze_conversation_log的AI诊断生成"""
+    # 创建包含coze_conversation_log的就诊记录
+    coze_log = """AI: 您好，我是您的健康顾问。请问您今天感觉怎么样？
+User: 我最近总是感觉疲劳，而且体重增加了不少。
+AI: 明白了。您能描述一下您的饮食习惯吗？
+User: 我食欲还可以，但吃完饭后经常感觉腹胀。
+AI: 您最近睡眠质量如何？
+User: 睡眠还行，但有时会失眠。"""
+    
+    record_data = {
+        "uuid": "550e8400-e29b-41d4-a716-446655440016",
+        "patient_phone": "13800138015",
+        "patient_info": {
+            "name": "测试患者coze对话",
+            "sex": "FEMALE",
+            "birthday": "1990-06-15",
+            "phone": "13800138015"
+        },
+        "pre_diagnosis": {
+            "uuid": "660e8400-e29b-41d4-a716-446655440016",
+            "height": 165.0,
+            "weight": 68.0,
+            "coze_conversation_log": coze_log
+        }
+    }
+    
+    create_response = await client.post("/api/v1/medical-record", json=record_data)
+    assert create_response.status_code == 201
+    record_id = create_response.json()["data"]["record_id"]
+    
+    # Mock TCM诊断服务
+    mock_diagnosis_result = {
+        "overall_status": "success",
+        "medical_record_result": {
+            "medical_record": "主诉：疲劳、体重增加\n病史：身高165cm，体重68kg，食欲可，饭后腹胀..."
+        },
+        "diagnosis_result": {
+            "diagnosis": "脾虚湿困型",
+            "diagnosis_explanation": "根据预问诊和医患对话，患者疲劳、腹胀、体重增加..."
+        },
+        "prescription_result": {
+            "prescription": "党参 10g\n麸炒白术 15g\n茯苓 15g..."
+        },
+        "exercise_prescription_result": {
+            "exercise_prescription": "第一周：快走30分钟，每周5次..."
+        },
+        "total_processing_time": 12.3
+    }
+    
+    with patch('app.api.patient.get_tcm_service') as mock_service:
+        mock_instance = Mock()
+        mock_instance.process_complete_diagnosis.return_value = mock_diagnosis_result
+        mock_service.return_value = mock_instance
+        
+        # 创建AI诊断
+        diagnosis_data = {
+            "asr_text": "医生：根据您的预问诊信息，您提到了疲劳和体重增加？\n患者：是的，而且我还觉得肢体有些困重。"
+        }
+        
+        response = await client.post(
+            f"/api/v1/medical-record/{record_id}/ai-diagnosis",
+            json=diagnosis_data,
+            headers=auth_headers
+        )
+        
+        assert response.status_code == 201
+        data = response.json()
+        assert data["success"] is True
+        assert data["data"]["type_inference"] == "脾虚湿困型"
+        assert data["data"]["formatted_medical_record"] is not None
+        assert data["data"]["prescription"] is not None
+        
+        # 验证process_complete_diagnosis被调用时传入了正确的参数
+        mock_instance.process_complete_diagnosis.assert_called_once()
+        call_args = mock_instance.process_complete_diagnosis.call_args
+        
+        # 验证coze_conversation_log参数被正确传递
+        assert call_args.kwargs["coze_conversation_log"] == coze_log
+        assert call_args.kwargs["height"] == 165.0
+        assert call_args.kwargs["weight"] == 68.0
+        assert "疲劳" in call_args.kwargs["transcript"] or "肢体有些困重" in call_args.kwargs["transcript"]
+
+
+@pytest.mark.asyncio
+async def test_create_ai_diagnosis_without_coze_log(client: AsyncClient, auth_headers: dict):
+    """测试没有coze_conversation_log时的AI诊断生成"""
+    # 创建不包含coze_conversation_log的就诊记录
+    record_data = {
+        "uuid": "550e8400-e29b-41d4-a716-446655440017",
+        "patient_phone": "13800138016",
+        "patient_info": {
+            "name": "无coze对话测试",
+            "sex": "MALE",
+            "birthday": "1988-03-20",
+            "phone": "13800138016"
+        },
+        "pre_diagnosis": {
+            "uuid": "660e8400-e29b-41d4-a716-446655440017",
+            "height": 178.0,
+            "weight": 90.0
+            # 注意：没有coze_conversation_log字段
+        }
+    }
+    
+    create_response = await client.post("/api/v1/medical-record", json=record_data)
+    assert create_response.status_code == 201
+    record_id = create_response.json()["data"]["record_id"]
+    
+    # Mock TCM诊断服务
+    mock_diagnosis_result = {
+        "overall_status": "success",
+        "medical_record_result": {
+            "medical_record": "主诉：体重过重\n病史：身高178cm，体重90kg..."
+        },
+        "diagnosis_result": {
+            "diagnosis": "胃热燔脾型",
+            "diagnosis_explanation": "患者食欲旺盛，体重超标..."
+        },
+        "prescription_result": {
+            "prescription": "北柴胡 10g\n牡丹皮 10g\n知母 10g..."
+        },
+        "exercise_prescription_result": {
+            "exercise_prescription": "第一周：慢跑20分钟，每周4次..."
+        },
+        "total_processing_time": 9.8
+    }
+    
+    with patch('app.api.patient.get_tcm_service') as mock_service:
+        mock_instance = Mock()
+        mock_instance.process_complete_diagnosis.return_value = mock_diagnosis_result
+        mock_service.return_value = mock_instance
+        
+        # 创建AI诊断
+        diagnosis_data = {
+            "asr_text": "医生：您好，请问有什么不舒服？\n患者：我觉得自己体重太重了，想减肥。"
+        }
+        
+        response = await client.post(
+            f"/api/v1/medical-record/{record_id}/ai-diagnosis",
+            json=diagnosis_data,
+            headers=auth_headers
+        )
+        
+        assert response.status_code == 201
+        data = response.json()
+        assert data["success"] is True
+        
+        # 验证process_complete_diagnosis被调用
+        mock_instance.process_complete_diagnosis.assert_called_once()
+        call_args = mock_instance.process_complete_diagnosis.call_args
+        
+        # 验证当没有coze_conversation_log时，传入的是None
+        assert call_args.kwargs["coze_conversation_log"] is None
+        assert call_args.kwargs["height"] == 178.0
+        assert call_args.kwargs["weight"] == 90.0
+
+
+@pytest.mark.asyncio
 async def test_create_ai_diagnosis_record_not_found(client: AsyncClient, auth_headers: dict):
     """测试为不存在的就诊记录创建AI诊断"""
     diagnosis_data = {

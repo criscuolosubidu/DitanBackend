@@ -345,7 +345,6 @@ async def create_ai_diagnosis(
     
     - **record_id**: 就诊记录ID
     - **diagnosis_data**: 包含ASR转录文本的诊断请求数据
-    
     **认证：**
     需要医生登录认证，在请求头中提供有效的JWT令牌：
     Authorization: Bearer <access_token>
@@ -366,12 +365,14 @@ async def create_ai_diagnosis(
         if not medical_record:
             raise NotFoundException(message=f"未找到就诊记录 ID: {record_id}")
         
-        # 获取身高体重信息
+        # 获取身高体重信息,以及预问诊AI患者回答交互信息
         height = None
         weight = None
+        coze_conversation_log = None
         if medical_record.pre_diagnosis:
             height = medical_record.pre_diagnosis.height
             weight = medical_record.pre_diagnosis.weight
+            coze_conversation_log = medical_record.pre_diagnosis.coze_conversation_log
         
         # 调用AI诊断服务
         logger.info(f"开始为就诊记录 {record_id} 生成AI诊断...")
@@ -380,7 +381,8 @@ async def create_ai_diagnosis(
         diagnosis_result = tcm_service.process_complete_diagnosis(
             transcript=diagnosis_data.asr_text,
             height=height,
-            weight=weight
+            weight=weight,
+            coze_conversation_log=coze_conversation_log
         )
         
         if diagnosis_result["overall_status"] == "failed":
