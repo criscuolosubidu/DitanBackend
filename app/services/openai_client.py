@@ -1,8 +1,9 @@
 """
 OpenAI客户端服务
 """
+import httpx
 import openai
-from typing import List, Optional, Any, cast
+from typing import List, Optional, Any, cast, AsyncGenerator
 from openai.types.chat import (
     ChatCompletionMessageParam,
     ChatCompletionUserMessageParam,
@@ -15,11 +16,25 @@ from app.core.logging import get_logger
 logger = get_logger(__name__)
 
 
+# 配置适合流式传输的超时时间
+# connect: 连接建立超时
+# read: 读取单个chunk的超时（流式传输时每个chunk都会重置）
+# write: 写入请求的超时
+# pool: 连接池获取连接的超时
+STREAM_TIMEOUT = httpx.Timeout(
+    connect=30.0,      # 连接超时30秒
+    read=120.0,        # 读取超时120秒（流式响应可能有较长间隔）
+    write=30.0,        # 写入超时30秒
+    pool=30.0          # 连接池超时30秒
+)
+
+
 class OpenAIChatCompletion:
     """
     OpenAI Chat Completion API的封装类
     
     用于方便地调用OpenAI的聊天完成API，支持自定义API密钥、基础URL和模型名称。
+    支持同步和异步调用。
     """
     
     def __init__(self, api_key: str, base_url: str, model_name: str):
@@ -35,12 +50,20 @@ class OpenAIChatCompletion:
         self.base_url = base_url
         self.model_name = model_name
         
-        # 初始化OpenAI客户端
+        # 初始化同步OpenAI客户端（带超时配置）
         self.client = openai.OpenAI(
             api_key=self.api_key,
-            base_url=self.base_url
+            base_url=self.base_url,
+            timeout=STREAM_TIMEOUT
         )
-        logger.info(f"OpenAI客户端初始化成功，模型: {model_name}")
+        
+        # 初始化异步OpenAI客户端（带超时配置）
+        self.async_client = openai.AsyncOpenAI(
+            api_key=self.api_key,
+            base_url=self.base_url,
+            timeout=STREAM_TIMEOUT
+        )
+        logger.info(f"OpenAI客户端初始化成功，模型: {model_name}, 超时配置: connect={STREAM_TIMEOUT.connect}s, read={STREAM_TIMEOUT.read}s")
     
     def chat(self, messages: List[ChatCompletionMessageParam], 
              temperature: float = 0.7,
@@ -116,7 +139,7 @@ class OpenAIChatCompletion:
                    max_tokens: Optional[int] = None,
                    **kwargs):
         """
-        流式聊天方法
+        流式聊天方法（同步版本）
         
         Args:
             messages (List[ChatCompletionMessageParam]): 消息列表
@@ -138,6 +161,42 @@ class OpenAIChatCompletion:
         for chunk in response:
             if chunk.choices[0].delta.content is not None:
                 yield chunk.choices[0].delta.content
+    
+    async def async_stream_chat(
+        self, 
+        messages: List[ChatCompletionMessageParam], 
+        temperature: float = 0.7,
+        max_tokens: Optional[int] = None,
+        **kwargs
+    ) -> AsyncGenerator[str, None]:
+        """
+        异步流式聊天方法
+        
+        Args:
+            messages (List[ChatCompletionMessageParam]): 消息列表
+            temperature (float): 温度参数
+            max_tokens (Optional[int]): 最大token数量
+            **kwargs: 其他OpenAI API参数
+            
+        Yields:
+            流式响应的每个chunk
+        """
+        try:
+            response = await self.async_client.chat.completions.create(
+                model=self.model_name,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                stream=True,
+                **kwargs
+            )
+            
+            async for chunk in response:
+                if chunk.choices[0].delta.content is not None:
+                    yield chunk.choices[0].delta.content
+        except Exception as e:
+            logger.error(f"异步流式调用OpenAI API时发生错误: {e}")
+            raise e
     
     def get_model_info(self) -> dict:
         """
