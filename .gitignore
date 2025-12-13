@@ -54,3 +54,5 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+
+demo/mini-tcm/output
