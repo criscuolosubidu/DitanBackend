@@ -213,9 +213,31 @@ class AIDiagnosisResponse(DiagnosisRecordBase):
     model_config = {"from_attributes": True}
 
 
-class DoctorDiagnosisCreate(DiagnosisRecordBase):
-    """创建医生诊断请求"""
-    doctor_id: str = Field(..., description="医生ID")
+class DoctorDiagnosisCreate(BaseModel):
+    """创建医生诊断请求
+    
+    用于医生在AI诊断基础上创建自己的诊断记录。
+    如果提供了 based_on_ai_diagnosis_id，则会先复制AI诊断内容，再用提供的字段覆盖。
+    """
+    based_on_ai_diagnosis_id: Optional[int] = Field(None, description="基于哪个AI诊断创建（可选，会复制AI诊断内容）")
+    formatted_medical_record: Optional[str] = Field(None, description="格式化病历")
+    type_inference: Optional[str] = Field(None, description="证型推断")
+    treatment: Optional[str] = Field(None, description="治疗建议")
+    prescription: Optional[str] = Field(None, description="处方")
+    exercise_prescription: Optional[str] = Field(None, description="运动处方")
+    comments: Optional[str] = Field(None, description="医生备注")
+
+
+class DoctorDiagnosisUpdate(BaseModel):
+    """更新医生诊断请求
+    
+    用于医生修改自己创建的诊断记录。只有提供的字段会被更新。
+    """
+    formatted_medical_record: Optional[str] = Field(None, description="格式化病历")
+    type_inference: Optional[str] = Field(None, description="证型推断")
+    treatment: Optional[str] = Field(None, description="治疗建议")
+    prescription: Optional[str] = Field(None, description="处方")
+    exercise_prescription: Optional[str] = Field(None, description="运动处方")
     comments: Optional[str] = Field(None, description="医生备注")
 
 
@@ -224,7 +246,8 @@ class DoctorDiagnosisResponse(DiagnosisRecordBase):
     diagnosis_id: int
     record_id: int
     type: DiagnosisType
-    doctor_id: Optional[str] = None
+    doctor_id: int
+    doctor_name: Optional[str] = None
     comments: Optional[str] = None
     created_at: datetime
     updated_at: datetime

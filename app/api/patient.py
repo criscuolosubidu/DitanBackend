@@ -20,8 +20,24 @@
    - 医生查看预就诊信息（PreDiagnosisRecord）
    - 医生与患者对话，ASR实时转录
    - 调用 POST /medical-record/{record_id}/ai-diagnosis 生成AI诊断建议
-   - 医生调整诊断，提交最终诊断（待实现）
    - **所有医生操作都需要在请求头中携带 JWT 令牌进行认证**
+
+4. 医生确认诊断阶段（需要医生登录认证）：
+   - 医生查看AI诊断结果
+   - 调用 POST /medical-record/{record_id}/doctor-diagnosis 创建医生诊断记录
+     （可选择基于AI诊断创建，会自动复制AI诊断内容）
+   - 医生可多次调用 PUT /doctor-diagnosis/{diagnosis_id} 修改诊断内容
+   - 确认无误后，调用 POST /medical-record/{record_id}/confirm 确认就诊完成
+   - 确认后就诊记录状态变为 "confirmed"，诊断内容不可再修改
+
+就诊记录状态流转：
+================
+pending → in_progress → completed → confirmed
+
+- pending: 预就诊数据已上传，等待就诊
+- in_progress: 医生已开始处理（创建医生诊断记录时自动转换）
+- completed: AI诊断已完成
+- confirmed: 医生已确认最终诊断，就诊结束
 """
 from fastapi import APIRouter, Depends, Request, Query, Path
 from fastapi.responses import StreamingResponse
@@ -45,6 +61,8 @@ from app.models.patient import (
     PreDiagnosisRecord,
     SanzhenAnalysisResult,
     AIDiagnosisRecord,
+    DoctorDiagnosisRecord,
+    DiagnosisRecord,
     Doctor,
 )
 from app.schemas.patient import (
@@ -57,6 +75,9 @@ from app.schemas.patient import (
     CompleteMedicalRecordResponse,
     AIDiagnosisCreate,
     AIDiagnosisResponse,
+    DoctorDiagnosisCreate,
+    DoctorDiagnosisUpdate,
+    DoctorDiagnosisResponse,
     APIResponse,
 )
 from app.services.tcm_diagnosis_service import TCMDiagnosisService
@@ -562,3 +583,399 @@ async def create_ai_diagnosis_stream(
             "X-Accel-Buffering": "no",  # 禁用Nginx缓冲
         }
     )
+
+
+# ========== 医生诊断相关API ==========
+
+@router.post("/medical-record/{record_id}/doctor-diagnosis", response_model=APIResponse, status_code=201)
+async def create_doctor_diagnosis(
+    request: Request,
+    record_id: int = Path(..., description="就诊记录ID"),
+    diagnosis_data: DoctorDiagnosisCreate = ...,
+    db: AsyncSession = Depends(get_db),
+    current_doctor: Doctor = Depends(get_current_active_doctor),
+):
+    """
+    创建医生诊断记录
+    
+    医生在查看AI诊断结果后，可以创建自己的诊断记录。
+    
+    **使用场景：**
+    - AI诊断完成后，医生需要确认或修改诊断内容
+    - 医生可以基于AI诊断创建（自动复制内容），也可以从零开始创建
+    
+    **参数说明：**
+    - **record_id**: 就诊记录ID
+    - **diagnosis_data**: 诊断数据
+      - `based_on_ai_diagnosis_id`: 可选，提供AI诊断ID则会先复制AI诊断内容
+      - 其他字段会覆盖复制的内容（如果提供了的话）
+    
+    **认证：**
+    需要医生登录认证，在请求头中提供有效的JWT令牌：
+    Authorization: Bearer <access_token>
+    """
+    endpoint = f"{request.method} {request.url.path}"
+    
+    try:
+        log_request(logger, endpoint, {"record_id": record_id, "doctor_id": current_doctor.doctor_id})
+        
+        # 验证就诊记录存在
+        result = await db.execute(
+            select(PatientMedicalRecord)
+            .where(PatientMedicalRecord.record_id == record_id)
+        )
+        medical_record = result.scalar_one_or_none()
+        
+        if not medical_record:
+            raise NotFoundException(message=f"未找到就诊记录 ID: {record_id}")
+        
+        # 初始化诊断字段
+        formatted_medical_record = diagnosis_data.formatted_medical_record
+        type_inference = diagnosis_data.type_inference
+        treatment = diagnosis_data.treatment
+        prescription = diagnosis_data.prescription
+        exercise_prescription = diagnosis_data.exercise_prescription
+        
+        # 如果指定了基于AI诊断创建，则先复制AI诊断内容
+        if diagnosis_data.based_on_ai_diagnosis_id:
+            ai_result = await db.execute(
+                select(AIDiagnosisRecord)
+                .where(
+                    AIDiagnosisRecord.diagnosis_id == diagnosis_data.based_on_ai_diagnosis_id,
+                    AIDiagnosisRecord.record_id == record_id
+                )
+            )
+            ai_diagnosis = ai_result.scalar_one_or_none()
+            
+            if not ai_diagnosis:
+                raise NotFoundException(
+                    message=f"未找到AI诊断记录 ID: {diagnosis_data.based_on_ai_diagnosis_id}"
+                )
+            
+            # 使用AI诊断内容作为基础，再用请求中提供的字段覆盖
+            formatted_medical_record = diagnosis_data.formatted_medical_record or ai_diagnosis.formatted_medical_record
+            type_inference = diagnosis_data.type_inference or ai_diagnosis.type_inference
+            treatment = diagnosis_data.treatment or ai_diagnosis.treatment
+            prescription = diagnosis_data.prescription or ai_diagnosis.prescription
+            exercise_prescription = diagnosis_data.exercise_prescription or ai_diagnosis.exercise_prescription
+        
+        # 创建医生诊断记录
+        doctor_diagnosis = DoctorDiagnosisRecord(
+            record_id=record_id,
+            doctor_id=current_doctor.doctor_id,
+            formatted_medical_record=formatted_medical_record,
+            type_inference=type_inference,
+            treatment=treatment,
+            prescription=prescription,
+            exercise_prescription=exercise_prescription,
+            comments=diagnosis_data.comments
+        )
+        
+        db.add(doctor_diagnosis)
+        
+        # 更新就诊记录状态为进行中
+        if medical_record.status == "pending":
+            medical_record.status = "in_progress"
+        
+        await db.commit()
+        await db.refresh(doctor_diagnosis)
+        
+        logger.info(f"成功创建医生诊断记录: diagnosis_id={doctor_diagnosis.diagnosis_id}, doctor_id={current_doctor.doctor_id}")
+        
+        response_data = DoctorDiagnosisResponse(
+            diagnosis_id=doctor_diagnosis.diagnosis_id,
+            record_id=doctor_diagnosis.record_id,
+            type=doctor_diagnosis.type,
+            doctor_id=doctor_diagnosis.doctor_id,
+            doctor_name=current_doctor.name,
+            formatted_medical_record=doctor_diagnosis.formatted_medical_record,
+            type_inference=doctor_diagnosis.type_inference,
+            treatment=doctor_diagnosis.treatment,
+            prescription=doctor_diagnosis.prescription,
+            exercise_prescription=doctor_diagnosis.exercise_prescription,
+            comments=doctor_diagnosis.comments,
+            created_at=doctor_diagnosis.created_at,
+            updated_at=doctor_diagnosis.updated_at
+        )
+        
+        response = APIResponse(
+            success=True,
+            message="医生诊断记录创建成功",
+            data=response_data.model_dump()
+        )
+        
+        log_response(logger, endpoint, response.model_dump())
+        
+        return response
+        
+    except NotFoundException:
+        raise
+        
+    except Exception as e:
+        error_msg = "创建医生诊断记录时发生错误"
+        log_error(logger, error_msg, e)
+        raise DatabaseException(message=error_msg, detail=str(e))
+
+
+@router.put("/doctor-diagnosis/{diagnosis_id}", response_model=APIResponse, status_code=200)
+async def update_doctor_diagnosis(
+    request: Request,
+    diagnosis_id: int = Path(..., description="诊断记录ID"),
+    diagnosis_data: DoctorDiagnosisUpdate = ...,
+    db: AsyncSession = Depends(get_db),
+    current_doctor: Doctor = Depends(get_current_active_doctor),
+):
+    """
+    更新医生诊断记录
+    
+    医生可以修改自己创建的诊断记录。
+    
+    **使用场景：**
+    - 医生在就诊过程中逐步完善诊断内容
+    - 医生需要修正之前的诊断内容
+    
+    **参数说明：**
+    - **diagnosis_id**: 诊断记录ID
+    - **diagnosis_data**: 需要更新的字段（只有提供的字段会被更新）
+    
+    **注意：**
+    - 只能修改自己创建的诊断记录
+    - 已确认完成的就诊记录不能再修改（status = "confirmed"）
+    
+    **认证：**
+    需要医生登录认证，在请求头中提供有效的JWT令牌：
+    Authorization: Bearer <access_token>
+    """
+    endpoint = f"{request.method} {request.url.path}"
+    
+    try:
+        log_request(logger, endpoint, {"diagnosis_id": diagnosis_id, "doctor_id": current_doctor.doctor_id})
+        
+        # 查询诊断记录
+        result = await db.execute(
+            select(DoctorDiagnosisRecord)
+            .options(selectinload(DoctorDiagnosisRecord.medical_record))
+            .where(DoctorDiagnosisRecord.diagnosis_id == diagnosis_id)
+        )
+        doctor_diagnosis = result.scalar_one_or_none()
+        
+        if not doctor_diagnosis:
+            raise NotFoundException(message=f"未找到医生诊断记录 ID: {diagnosis_id}")
+        
+        # 验证是否是当前医生创建的记录
+        if doctor_diagnosis.doctor_id != current_doctor.doctor_id:
+            raise ValidationException(
+                message="无权修改此诊断记录",
+                detail="只能修改自己创建的诊断记录"
+            )
+        
+        # 检查就诊记录状态
+        if doctor_diagnosis.medical_record.status == "confirmed":
+            raise ValidationException(
+                message="无法修改已确认的诊断记录",
+                detail="就诊记录已确认完成，不能再修改"
+            )
+        
+        # 更新字段（只更新提供了的字段）
+        update_data = diagnosis_data.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            if value is not None:
+                setattr(doctor_diagnosis, field, value)
+        
+        await db.commit()
+        await db.refresh(doctor_diagnosis)
+        
+        logger.info(f"成功更新医生诊断记录: diagnosis_id={diagnosis_id}")
+        
+        response_data = DoctorDiagnosisResponse(
+            diagnosis_id=doctor_diagnosis.diagnosis_id,
+            record_id=doctor_diagnosis.record_id,
+            type=doctor_diagnosis.type,
+            doctor_id=doctor_diagnosis.doctor_id,
+            doctor_name=current_doctor.name,
+            formatted_medical_record=doctor_diagnosis.formatted_medical_record,
+            type_inference=doctor_diagnosis.type_inference,
+            treatment=doctor_diagnosis.treatment,
+            prescription=doctor_diagnosis.prescription,
+            exercise_prescription=doctor_diagnosis.exercise_prescription,
+            comments=doctor_diagnosis.comments,
+            created_at=doctor_diagnosis.created_at,
+            updated_at=doctor_diagnosis.updated_at
+        )
+        
+        response = APIResponse(
+            success=True,
+            message="医生诊断记录更新成功",
+            data=response_data.model_dump()
+        )
+        
+        log_response(logger, endpoint, response.model_dump())
+        
+        return response
+        
+    except (NotFoundException, ValidationException):
+        raise
+        
+    except Exception as e:
+        error_msg = "更新医生诊断记录时发生错误"
+        log_error(logger, error_msg, e)
+        raise DatabaseException(message=error_msg, detail=str(e))
+
+
+@router.get("/doctor-diagnosis/{diagnosis_id}", response_model=APIResponse, status_code=200)
+async def get_doctor_diagnosis(
+    request: Request,
+    diagnosis_id: int = Path(..., description="诊断记录ID"),
+    db: AsyncSession = Depends(get_db),
+    current_doctor: Doctor = Depends(get_current_active_doctor),
+):
+    """
+    获取医生诊断记录详情
+    
+    - **diagnosis_id**: 诊断记录ID
+    
+    **认证：**
+    需要医生登录认证，在请求头中提供有效的JWT令牌：
+    Authorization: Bearer <access_token>
+    """
+    endpoint = f"{request.method} {request.url.path}"
+    
+    try:
+        log_request(logger, endpoint, {"diagnosis_id": diagnosis_id})
+        
+        # 查询诊断记录，同时加载医生信息
+        result = await db.execute(
+            select(DoctorDiagnosisRecord)
+            .options(selectinload(DoctorDiagnosisRecord.doctor))
+            .where(DoctorDiagnosisRecord.diagnosis_id == diagnosis_id)
+        )
+        doctor_diagnosis = result.scalar_one_or_none()
+        
+        if not doctor_diagnosis:
+            raise NotFoundException(message=f"未找到医生诊断记录 ID: {diagnosis_id}")
+        
+        response_data = DoctorDiagnosisResponse(
+            diagnosis_id=doctor_diagnosis.diagnosis_id,
+            record_id=doctor_diagnosis.record_id,
+            type=doctor_diagnosis.type,
+            doctor_id=doctor_diagnosis.doctor_id,
+            doctor_name=doctor_diagnosis.doctor.name if doctor_diagnosis.doctor else None,
+            formatted_medical_record=doctor_diagnosis.formatted_medical_record,
+            type_inference=doctor_diagnosis.type_inference,
+            treatment=doctor_diagnosis.treatment,
+            prescription=doctor_diagnosis.prescription,
+            exercise_prescription=doctor_diagnosis.exercise_prescription,
+            comments=doctor_diagnosis.comments,
+            created_at=doctor_diagnosis.created_at,
+            updated_at=doctor_diagnosis.updated_at
+        )
+        
+        response = APIResponse(
+            success=True,
+            message="医生诊断记录查询成功",
+            data=response_data.model_dump()
+        )
+        
+        log_response(logger, endpoint, response.model_dump())
+        
+        return response
+        
+    except NotFoundException:
+        raise
+        
+    except Exception as e:
+        error_msg = "查询医生诊断记录时发生错误"
+        log_error(logger, error_msg, e)
+        raise DatabaseException(message=error_msg, detail=str(e))
+
+
+@router.post("/medical-record/{record_id}/confirm", response_model=APIResponse, status_code=200)
+async def confirm_medical_record(
+    request: Request,
+    record_id: int = Path(..., description="就诊记录ID"),
+    db: AsyncSession = Depends(get_db),
+    current_doctor: Doctor = Depends(get_current_active_doctor),
+):
+    """
+    确认就诊完成
+    
+    医生确认诊断内容后，调用此接口完成就诊。
+    确认后就诊记录状态变为 "confirmed"，不能再修改诊断内容。
+    
+    **使用场景：**
+    - 医生完成诊断后，确认提交最终结果
+    - 确认后诊断内容将被锁定
+    
+    **前置条件：**
+    - 就诊记录必须存在医生诊断记录
+    - 就诊记录状态不能是 "confirmed"
+    
+    **认证：**
+    需要医生登录认证，在请求头中提供有效的JWT令牌：
+    Authorization: Bearer <access_token>
+    """
+    endpoint = f"{request.method} {request.url.path}"
+    
+    try:
+        log_request(logger, endpoint, {"record_id": record_id, "doctor_id": current_doctor.doctor_id})
+        
+        # 查询就诊记录
+        result = await db.execute(
+            select(PatientMedicalRecord)
+            .options(selectinload(PatientMedicalRecord.diagnoses))
+            .where(PatientMedicalRecord.record_id == record_id)
+        )
+        medical_record = result.scalar_one_or_none()
+        
+        if not medical_record:
+            raise NotFoundException(message=f"未找到就诊记录 ID: {record_id}")
+        
+        # 检查是否已确认
+        if medical_record.status == "confirmed":
+            raise ValidationException(
+                message="就诊记录已确认",
+                detail="此就诊记录已经确认完成，无需重复确认"
+            )
+        
+        # 检查是否有医生诊断记录
+        doctor_diagnoses = [
+            d for d in medical_record.diagnoses 
+            if isinstance(d, DoctorDiagnosisRecord)
+        ]
+        
+        if not doctor_diagnoses:
+            raise ValidationException(
+                message="无法确认就诊",
+                detail="请先创建医生诊断记录后再确认"
+            )
+        
+        # 更新就诊记录状态
+        medical_record.status = "confirmed"
+        
+        await db.commit()
+        await db.refresh(medical_record)
+        
+        logger.info(f"就诊记录已确认: record_id={record_id}, doctor_id={current_doctor.doctor_id}")
+        
+        response = APIResponse(
+            success=True,
+            message="就诊已确认完成",
+            data={
+                "record_id": medical_record.record_id,
+                "status": medical_record.status,
+                "confirmed_by": current_doctor.name,
+                "confirmed_at": medical_record.updated_at.isoformat()
+            }
+        )
+        
+        log_response(logger, endpoint, response.model_dump())
+        
+        return response
+        
+    except (NotFoundException, ValidationException):
+        raise
+        
+    except Exception as e:
+        error_msg = "确认就诊记录时发生错误"
+        log_error(logger, error_msg, e)
+        raise DatabaseException(message=error_msg, detail=str(e))
