@@ -1,9 +1,16 @@
 """
 中医诊断服务
 """
+import asyncio
+import json
 import re
 import time
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, AsyncGenerator, List, cast
+
+from openai.types.chat import (
+    ChatCompletionMessageParam,
+    ChatCompletionUserMessageParam,
+)
 
 from app.services.openai_client import OpenAIChatCompletion
 from app.services.prompt_templates import (
@@ -16,6 +23,14 @@ from app.core.logging import get_logger
 
 
 logger = get_logger(__name__)
+
+
+# 流式诊断阶段定义
+class DiagnosisStage:
+    MEDICAL_RECORD = "medical_record"
+    DIAGNOSIS = "diagnosis"
+    PRESCRIPTION = "prescription"
+    EXERCISE_PRESCRIPTION = "exercise_prescription"
 
 
 class TCMDiagnosisService:
@@ -402,4 +417,228 @@ class TCMDiagnosisService:
             "total_processing_time": total_duration,
             "timestamp": time.time()
         }
+
+    async def _async_stream_llm_response(
+        self,
+        prompt: str,
+        temperature: float = 0.7
+    ) -> AsyncGenerator[str, None]:
+        """
+        异步流式调用LLM并返回内容块
+        
+        Args:
+            prompt: 提示词
+            temperature: 温度参数
+            
+        Yields:
+            str: 响应内容块
+        """
+        messages: List[ChatCompletionMessageParam] = [
+            cast(ChatCompletionUserMessageParam, {
+                "role": "user",
+                "content": prompt
+            })
+        ]
+        
+        async for chunk in self.llm.async_stream_chat(
+            messages=messages,
+            temperature=temperature
+        ):
+            yield chunk
+    
+    async def stream_complete_diagnosis(
+        self,
+        transcript: str,
+        height: Optional[float] = None,
+        weight: Optional[float] = None,
+        coze_conversation_log: Optional[str] = None
+    ) -> AsyncGenerator[str, None]:
+        """
+        流式处理完整的诊断流程，使用 SSE 格式返回
+        
+        Args:
+            transcript (str): 对话转录文本
+            height (Optional[float]): 身高(cm)
+            weight (Optional[float]): 体重(kg)
+            coze_conversation_log (Optional[str]): 数字人的对话日志
+            
+        Yields:
+            str: SSE格式的事件数据
+        """
+        logger.info("开始流式诊断流程...")
+        start_time = time.time()
+        
+        # 用于存储各阶段结果
+        medical_record = ""
+        diagnosis = ""
+        diagnosis_explanation = ""
+        prescription = ""
+        exercise_prescription = ""
+        
+        def create_sse_event(event_type: str, data: Dict[str, Any]) -> str:
+            """创建SSE事件格式"""
+            return f"event: {event_type}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+        
+        try:
+            # ========== 阶段1: 生成病历 ==========
+            yield create_sse_event("stage_start", {
+                "stage": DiagnosisStage.MEDICAL_RECORD,
+                "stage_name": "生成病历",
+                "step": "1/4"
+            })
+            
+            logger.info("[1/4] 流式生成病历")
+            medical_record_prompt = MEDICAL_RECORD_PROMPT_TEMPLATE.format(
+                transcript=transcript,
+                log_string=coze_conversation_log
+            )
+            
+            full_medical_response = ""
+            async for chunk in self._async_stream_llm_response(medical_record_prompt, temperature=0.6):
+                full_medical_response += chunk
+                yield create_sse_event("content", {
+                    "stage": DiagnosisStage.MEDICAL_RECORD,
+                    "chunk": chunk
+                })
+            
+            medical_record = self.extract_answer_from_response(full_medical_response)
+            
+            yield create_sse_event("stage_complete", {
+                "stage": DiagnosisStage.MEDICAL_RECORD,
+                "stage_name": "生成病历",
+                "result": medical_record
+            })
+            
+            if not medical_record:
+                yield create_sse_event("error", {
+                    "stage": DiagnosisStage.MEDICAL_RECORD,
+                    "message": "病历生成失败"
+                })
+                return
+            
+            # ========== 阶段2: 证型判断 ==========
+            yield create_sse_event("stage_start", {
+                "stage": DiagnosisStage.DIAGNOSIS,
+                "stage_name": "证型判断",
+                "step": "2/4"
+            })
+            
+            logger.info("[2/4] 流式证型判断")
+            diagnosis_prompt = TYPE_INFER_PROMPT_TEMPLATE.format(medical_record=medical_record)
+            
+            full_diagnosis_response = ""
+            async for chunk in self._async_stream_llm_response(diagnosis_prompt, temperature=0.3):
+                full_diagnosis_response += chunk
+                yield create_sse_event("content", {
+                    "stage": DiagnosisStage.DIAGNOSIS,
+                    "chunk": chunk
+                })
+            
+            diagnosis = self.extract_answer_from_response(full_diagnosis_response)
+            diagnosis_explanation = self.extract_think_from_response(full_diagnosis_response)
+            
+            yield create_sse_event("stage_complete", {
+                "stage": DiagnosisStage.DIAGNOSIS,
+                "stage_name": "证型判断",
+                "result": diagnosis,
+                "explanation": diagnosis_explanation
+            })
+            
+            if not diagnosis:
+                yield create_sse_event("error", {
+                    "stage": DiagnosisStage.DIAGNOSIS,
+                    "message": "证型判断失败"
+                })
+                return
+            
+            # ========== 阶段3: 处方生成 ==========
+            yield create_sse_event("stage_start", {
+                "stage": DiagnosisStage.PRESCRIPTION,
+                "stage_name": "处方生成",
+                "step": "3/4"
+            })
+            
+            logger.info("[3/4] 流式处方生成")
+            prescription_prompt = PRESCRIPTION_PROMPT_TEMPLATE.format(
+                medical_record=medical_record,
+                diagnosis_result=diagnosis
+            )
+            
+            full_prescription_response = ""
+            async for chunk in self._async_stream_llm_response(prescription_prompt, temperature=0.3):
+                full_prescription_response += chunk
+                yield create_sse_event("content", {
+                    "stage": DiagnosisStage.PRESCRIPTION,
+                    "chunk": chunk
+                })
+            
+            prescription = self.extract_answer_from_response(full_prescription_response)
+            
+            yield create_sse_event("stage_complete", {
+                "stage": DiagnosisStage.PRESCRIPTION,
+                "stage_name": "处方生成",
+                "result": prescription
+            })
+            
+            # ========== 阶段4: 运动处方生成 ==========
+            yield create_sse_event("stage_start", {
+                "stage": DiagnosisStage.EXERCISE_PRESCRIPTION,
+                "stage_name": "运动处方生成",
+                "step": "4/4"
+            })
+            
+            logger.info("[4/4] 流式运动处方生成")
+            
+            # 计算BMI
+            bmi = "未提供"
+            if height and weight:
+                height_m = height / 100
+                bmi_value = weight / (height_m ** 2)
+                bmi = f"{bmi_value:.2f}"
+            
+            exercise_prompt = EXERCISE_PRESCRIPTION_PROMPT_TEMPLATE.format(
+                medical_record=medical_record,
+                diagnosis_result=diagnosis,
+                height=height if height else "未提供",
+                weight=weight if weight else "未提供",
+                bmi=bmi
+            )
+            
+            full_exercise_response = ""
+            async for chunk in self._async_stream_llm_response(exercise_prompt, temperature=0.5):
+                full_exercise_response += chunk
+                yield create_sse_event("content", {
+                    "stage": DiagnosisStage.EXERCISE_PRESCRIPTION,
+                    "chunk": chunk
+                })
+            
+            exercise_prescription = self.extract_answer_from_response(full_exercise_response)
+            
+            yield create_sse_event("stage_complete", {
+                "stage": DiagnosisStage.EXERCISE_PRESCRIPTION,
+                "stage_name": "运动处方生成",
+                "result": exercise_prescription
+            })
+            
+            # ========== 完成 ==========
+            end_time = time.time()
+            total_duration = round(end_time - start_time, 2)
+            
+            logger.info(f"流式诊断流程完成，总耗时: {total_duration}s")
+            
+            yield create_sse_event("complete", {
+                "status": "success",
+                "total_processing_time": total_duration,
+                "formatted_medical_record": medical_record,
+                "type_inference": diagnosis,
+                "diagnosis_explanation": diagnosis_explanation,
+                "prescription": prescription,
+                "exercise_prescription": exercise_prescription
+            })
+            
+        except Exception as e:
+            logger.error(f"流式诊断出错: {str(e)}", exc_info=True)
+            yield create_sse_event("error", {
+                "message": f"诊断过程出错: {str(e)}"
+            })
 

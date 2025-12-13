@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # PostgreSQL 数据库服务
   db:
-    image: postgres:latest
+    image: postgres:17
     container_name: ditan_db
     restart: unless-stopped
     environment:

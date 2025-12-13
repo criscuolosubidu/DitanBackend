@@ -24,6 +24,7 @@
    - **所有医生操作都需要在请求头中携带 JWT 令牌进行认证**
 """
 from fastapi import APIRouter, Depends, Request, Query, Path
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -431,3 +432,133 @@ async def create_ai_diagnosis(
         error_msg = "生成AI诊断时发生错误"
         log_error(logger, error_msg, e)
         raise DatabaseException(message=error_msg, detail=str(e))
+
+
+@router.post("/medical-record/{record_id}/ai-diagnosis/stream", status_code=200)
+async def create_ai_diagnosis_stream(
+    request: Request,
+    record_id: int = Path(..., description="就诊记录ID"),
+    diagnosis_data: AIDiagnosisCreate = ...,
+    db: AsyncSession = Depends(get_db),
+    current_doctor: Doctor = Depends(get_current_active_doctor),
+):
+    """
+    为就诊记录生成AI诊断（流式返回）
+    
+    使用 Server-Sent Events (SSE) 流式返回诊断过程，提升用户体验。
+    
+    - **record_id**: 就诊记录ID
+    - **diagnosis_data**: 包含ASR转录文本的诊断请求数据
+    
+    **事件类型：**
+    - `stage_start`: 阶段开始，包含 stage、stage_name、step
+    - `content`: 内容流，包含 stage、chunk（实际内容片段）
+    - `stage_complete`: 阶段完成，包含 stage、stage_name、result
+    - `complete`: 全部完成，包含完整的诊断结果
+    - `error`: 错误信息
+    
+    **认证：**
+    需要医生登录认证，在请求头中提供有效的JWT令牌：
+    Authorization: Bearer <access_token>
+    """
+    import json
+    endpoint = f"{request.method} {request.url.path}"
+    
+    log_request(logger, endpoint, {"record_id": record_id, "asr_text_length": len(diagnosis_data.asr_text)})
+    
+    # 查询就诊记录
+    result = await db.execute(
+        select(PatientMedicalRecord)
+        .options(selectinload(PatientMedicalRecord.pre_diagnosis))
+        .where(PatientMedicalRecord.record_id == record_id)
+    )
+    medical_record = result.scalar_one_or_none()
+    
+    if not medical_record:
+        raise NotFoundException(message=f"未找到就诊记录 ID: {record_id}")
+    
+    # 获取身高体重信息,以及预问诊AI患者回答交互信息
+    height = None
+    weight = None
+    coze_conversation_log = None
+    if medical_record.pre_diagnosis:
+        height = medical_record.pre_diagnosis.height
+        weight = medical_record.pre_diagnosis.weight
+        coze_conversation_log = medical_record.pre_diagnosis.coze_conversation_log
+    
+    # 存储诊断结果用于后续保存
+    diagnosis_result_holder = {"data": None}
+    
+    async def generate_stream():
+        """生成SSE流"""
+        tcm_service = get_tcm_service()
+        
+        try:
+            async for event_data in tcm_service.stream_complete_diagnosis(
+                transcript=diagnosis_data.asr_text,
+                height=height,
+                weight=weight,
+                coze_conversation_log=coze_conversation_log
+            ):
+                yield event_data
+                
+                # 解析complete事件以获取最终结果
+                if event_data.startswith("event: complete"):
+                    lines = event_data.strip().split("\n")
+                    for line in lines:
+                        if line.startswith("data: "):
+                            diagnosis_result_holder["data"] = json.loads(line[6:])
+                            break
+        except Exception as e:
+            logger.error(f"流式诊断出错: {str(e)}")
+            error_event = f"event: error\ndata: {json.dumps({'message': str(e)}, ensure_ascii=False)}\n\n"
+            yield error_event
+    
+    async def stream_and_save():
+        """流式返回并在完成后保存结果"""
+        async for event_data in generate_stream():
+            yield event_data
+        
+        # 流结束后，保存诊断记录
+        if diagnosis_result_holder["data"] and diagnosis_result_holder["data"].get("status") == "success":
+            try:
+                final_result = diagnosis_result_holder["data"]
+                
+                ai_diagnosis = AIDiagnosisRecord(
+                    record_id=record_id,
+                    formatted_medical_record=final_result.get("formatted_medical_record"),
+                    type_inference=final_result.get("type_inference"),
+                    prescription=final_result.get("prescription"),
+                    exercise_prescription=final_result.get("exercise_prescription"),
+                    diagnosis_explanation=final_result.get("diagnosis_explanation"),
+                    response_time=final_result.get("total_processing_time"),
+                    model_name=settings.AI_MODEL_NAME
+                )
+                
+                db.add(ai_diagnosis)
+                medical_record.status = "completed"
+                await db.commit()
+                await db.refresh(ai_diagnosis)
+                
+                logger.info(f"成功保存流式AI诊断记录: diagnosis_id={ai_diagnosis.diagnosis_id}")
+                
+                # 发送保存成功事件
+                save_event = f"event: saved\ndata: {json.dumps({'diagnosis_id': ai_diagnosis.diagnosis_id, 'message': '诊断记录已保存'}, ensure_ascii=False)}\n\n"
+                yield save_event
+                
+            except Exception as e:
+                logger.error(f"保存诊断记录失败: {str(e)}")
+                error_event = f"event: save_error\ndata: {json.dumps({'message': f'保存诊断记录失败: {str(e)}'}, ensure_ascii=False)}\n\n"
+                yield error_event
+    
+    logger.info(f"开始为就诊记录 {record_id} 生成流式AI诊断...")
+    
+    return StreamingResponse(
+        stream_and_save(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # 禁用Nginx缓冲
+        }
+    )
