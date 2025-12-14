@@ -1,7 +1,7 @@
 services:
   # PostgreSQL 数据库服务
   db:
-    image: postgres:17
+    image: ${IMAGE_REGISTRY:-docker.huanyufuture.top}/postgres:17
     container_name: ditan_db
     restart: unless-stopped
     environment:
@@ -24,8 +24,8 @@ services:
 
   # 应用服务
   app:
-    # 生产环境：从腾讯云容器镜像服务拉取镜像，这里的镜像需要使用腾讯云的镜像地址
-    image: ccr.ccs.tencentyun.com/project-ditan/ditan-backend:latest
+    # 生产环境：从私有镜像仓库拉取镜像
+    image: ${IMAGE_REGISTRY:-docker.huanyufuture.top}/ditan-backend:${IMAGE_TAG:-latest}
     container_name: ditan_backend
     restart: unless-stopped
     ports:
