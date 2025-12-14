@@ -63,6 +63,7 @@ from app.models.patient import (
     AIDiagnosisRecord,
     DoctorDiagnosisRecord,
     Doctor,
+    DiagnosisType,
 )
 from app.schemas.patient import (
     PatientResponse,
@@ -627,6 +628,13 @@ async def create_doctor_diagnosis(
         if not medical_record:
             raise NotFoundException(message=f"未找到就诊记录 ID: {record_id}")
 
+        # 检查就诊记录是否已确认锁定
+        if medical_record.status == "confirmed":
+            raise ValidationException(
+                message="无法创建医生诊断记录",
+                detail="就诊记录已确认完成，不能再添加新的诊断记录"
+            )
+
         # 初始化诊断字段
         formatted_medical_record = diagnosis_data.formatted_medical_record
         type_inference = diagnosis_data.type_inference
@@ -671,8 +679,8 @@ async def create_doctor_diagnosis(
 
         db.add(doctor_diagnosis)
 
-        # 更新就诊记录状态为进行中
-        if medical_record.status == "pending":
+        # 更新就诊记录状态为进行中（pending 或 completed 都转换为 in_progress）
+        if medical_record.status in ("pending", "completed"):
             medical_record.status = "in_progress"
 
         await db.commit()
@@ -936,13 +944,13 @@ async def confirm_medical_record(
                 detail="此就诊记录已经确认完成，无需重复确认"
             )
 
-        # 检查是否有医生诊断记录
-        doctor_diagnoses = [
-            d for d in medical_record.diagnoses
-            if isinstance(d, DoctorDiagnosisRecord)
-        ]
+        # 检查是否有医生诊断记录（使用 type 属性检查，避免依赖多态实例化行为）
+        has_doctor_diagnosis = any(
+            d.type == DiagnosisType.DOCTOR_DIAGNOSIS
+            for d in medical_record.diagnoses
+        )
 
-        if not doctor_diagnoses:
+        if not has_doctor_diagnosis:
             raise ValidationException(
                 message="无法确认就诊",
                 detail="请先创建医生诊断记录后再确认"
