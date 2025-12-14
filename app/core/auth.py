@@ -40,19 +40,19 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """创建访问令牌"""
     to_encode = data.copy()
-    
+
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
         expire = datetime.utcnow() + timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
-    
+
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(
         to_encode,
         settings.JWT_SECRET_KEY,
         algorithm=settings.JWT_ALGORITHM
     )
-    
+
     return encoded_jwt
 
 
@@ -66,16 +66,16 @@ def decode_access_token(token: str) -> TokenData:
         )
         doctor_id: int = payload.get("doctor_id")
         username: str = payload.get("username")
-        
+
         if doctor_id is None or username is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="无效的认证凭证",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        
+
         return TokenData(doctor_id=doctor_id, username=username)
-        
+
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -85,8 +85,8 @@ def decode_access_token(token: str) -> TokenData:
 
 
 async def get_current_doctor(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-    db: AsyncSession = Depends(get_db)
+        credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+        db: AsyncSession = Depends(get_db)
 ) -> Doctor:
     """获取当前登录的医生"""
     # 检查是否提供了认证凭证
@@ -96,30 +96,29 @@ async def get_current_doctor(
             detail="未提供认证凭证",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     token = credentials.credentials
     token_data = decode_access_token(token)
-    
+
     # 从数据库查询医生信息
     result = await db.execute(
         select(Doctor).where(Doctor.doctor_id == token_data.doctor_id)
     )
     doctor = result.scalar_one_or_none()
-    
+
     if doctor is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="医生账户不存在",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     return doctor
 
 
 async def get_current_active_doctor(
-    current_doctor: Doctor = Depends(get_current_doctor)
+        current_doctor: Doctor = Depends(get_current_doctor)
 ) -> Doctor:
     """获取当前活跃的医生（可以在此添加额外的验证逻辑）"""
     # 这里可以添加额外的验证，例如检查账户是否被禁用等
     return current_doctor
-

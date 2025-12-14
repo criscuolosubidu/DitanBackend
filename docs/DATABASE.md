@@ -5,9 +5,11 @@
 ### 核心实体
 
 #### 1. Doctor（医生）
+
 医生用户实体，用于系统登录和诊断管理。
 
 **字段说明：**
+
 - `doctor_id`: 医生ID（主键）
 - `username`: 用户名（唯一，用于登录）
 - `password_hash`: 密码哈希（使用bcrypt加密）
@@ -22,12 +24,15 @@
 - `last_login`: 最后登录时间
 
 **关系：**
+
 - 一个医生可以有多个诊断记录（DoctorDiagnosisRecord）
 
 #### 2. Patient（患者）
+
 患者基本信息。
 
 **字段说明：**
+
 - `patient_id`: 患者ID（主键）
 - `name`: 患者姓名
 - `sex`: 性别
@@ -35,12 +40,15 @@
 - `phone`: 手机号（唯一）
 
 **关系：**
+
 - 一个患者可以有多个就诊记录（PatientMedicalRecord）
 
 #### 3. PatientMedicalRecord（就诊记录）
+
 代表一次完整的就诊事件（聚合根）。
 
 **字段说明：**
+
 - `record_id`: 就诊记录ID（主键）
 - `patient_id`: 患者ID（外键）
 - `uuid`: UUID（用于幂等性控制）
@@ -49,14 +57,17 @@
 - `updated_at`: 更新时间
 
 **关系：**
+
 - 属于一个患者
 - 包含一个预诊记录（PreDiagnosisRecord）
 - 可以有多个诊断记录（DiagnosisRecord）
 
 #### 4. PreDiagnosisRecord（预诊记录）
+
 预诊阶段的数据采集记录。
 
 **字段说明：**
+
 - `pre_diagnosis_id`: 预诊记录ID（主键）
 - `record_id`: 就诊记录ID（外键）
 - `uuid`: UUID
@@ -67,13 +78,16 @@
 - `updated_at`: 更新时间
 
 **关系：**
+
 - 属于一个就诊记录
 - 可以有一个三诊分析结果（SanzhenAnalysisResult）
 
 #### 5. SanzhenAnalysisResult（三诊分析结果）
+
 面诊、舌诊、脉诊的分析结果。
 
 **字段说明：**
+
 - `sanzhen_id`: 三诊分析ID（主键）
 - `pre_diagnosis_id`: 预诊记录ID（外键）
 - `face`: 面诊结果
@@ -83,9 +97,11 @@
 - `diagnosis_result`: 综合诊断结果
 
 #### 6. DiagnosisRecord（诊断记录基类）
+
 诊断记录的抽象基类，使用单表继承（STI）模式。
 
 **字段说明：**
+
 - `diagnosis_id`: 诊断记录ID（主键）
 - `record_id`: 就诊记录ID（外键）
 - `type`: 诊断类型（AI_DIAGNOSIS/DOCTOR_DIAGNOSIS）
@@ -98,21 +114,26 @@
 - `updated_at`: 更新时间
 
 #### 7. AIDiagnosisRecord（AI诊断记录）
+
 继承自DiagnosisRecord。
 
 **额外字段：**
+
 - `diagnosis_explanation`: 诊断解释
 - `response_time`: 响应时间（秒）
 - `model_name`: 模型名称
 
 #### 8. DoctorDiagnosisRecord（医生诊断记录）
+
 继承自DiagnosisRecord，关联到医生。
 
 **额外字段：**
+
 - `doctor_id`: 医生ID（外键，关联到Doctor表）
 - `comments`: 医生备注
 
 **关系：**
+
 - 属于一个医生
 
 ## 数据库初始化
@@ -131,6 +152,7 @@ uv run python scripts/init_db.py
 ```
 
 该脚本会自动创建所有表，包括：
+
 - doctors（医生表）
 - patients（患者表）
 - patient_medical_records（就诊记录表）
@@ -190,11 +212,13 @@ CREATE INDEX idx_doctor_diagnosis_records_doctor_id ON doctor_diagnosis_records(
 ### 使用管理脚本
 
 **Linux/macOS:**
+
 ```bash
 ./scripts/manage_db.sh reset
 ```
 
 **Windows:**
+
 ```powershell
 .\scripts\manage_db.ps1 reset
 ```
@@ -218,7 +242,8 @@ uv run python scripts/init_db.py
 
 ### Q: 如何修改数据库结构？
 
-A: 
+A:
+
 1. 修改 `app/models/patient.py` 中的模型定义
 2. 运行 `uv run python scripts/init_db.py` 重新创建表
 3. 注意：这会删除所有现有数据
@@ -226,6 +251,7 @@ A:
 ### Q: 如何备份数据？
 
 A:
+
 ```bash
 # 备份数据库
 pg_dump -U postgres ditan_db > backup.sql
@@ -237,6 +263,7 @@ psql -U postgres ditan_db < backup.sql
 ### Q: 如何查看数据库表结构？
 
 A:
+
 ```bash
 # 连接数据库
 psql -U postgres ditan_db
@@ -252,7 +279,7 @@ psql -U postgres ditan_db
 
 ### Q: 医生诊断记录如何关联医生？
 
-A: 
+A:
 DoctorDiagnosisRecord 表通过 `doctor_id` 字段关联到 Doctor 表。创建医生诊断记录时，需要提供有效的医生ID。
 
 ```python
@@ -274,27 +301,34 @@ doctor_diagnosis = DoctorDiagnosisRecord(
 系统已创建以下索引：
 
 **doctors 表：**
+
 - `idx_doctors_username`: username字段（用于登录查询）
 - `idx_doctors_phone`: phone字段（用于手机号查询）
 
 **patients 表：**
+
 - `idx_patients_phone`: phone字段（用于患者查询）
 
 **patient_medical_records 表：**
+
 - `idx_medical_records_patient_id`: patient_id字段
 - `idx_medical_records_uuid`: uuid字段
 
 **pre_diagnosis_records 表：**
+
 - `idx_pre_diagnosis_record_id`: record_id字段
 - `idx_pre_diagnosis_uuid`: uuid字段
 
 **sanzhen_analysis_results 表：**
+
 - `idx_sanzhen_pre_diagnosis_id`: pre_diagnosis_id字段
 
 **diagnosis_records 表：**
+
 - `idx_diagnosis_record_id`: record_id字段
 
 **doctor_diagnosis_records 表：**
+
 - `idx_doctor_diagnosis_records_doctor_id`: doctor_id字段（用于查询某医生的诊断记录）
 
 ### 连接池配置

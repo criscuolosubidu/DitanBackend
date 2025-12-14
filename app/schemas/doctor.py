@@ -21,7 +21,7 @@ class DoctorRegister(BaseModel):
     department: Optional[str] = Field(None, max_length=100, description="科室")
     position: Optional[str] = Field(None, max_length=100, description="职位")
     bio: Optional[str] = Field(None, description="个人简介")
-    
+
     @field_validator("username")
     @classmethod
     def validate_username(cls, v: str) -> str:
@@ -29,7 +29,7 @@ class DoctorRegister(BaseModel):
         if not re.match(r'^[a-zA-Z0-9_]+$', v):
             raise ValueError("用户名只能包含字母、数字和下划线")
         return v
-    
+
     @field_validator("phone")
     @classmethod
     def validate_phone(cls, v: str) -> str:
@@ -67,7 +67,7 @@ class DoctorResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     last_login: Optional[datetime] = None
-    
+
     model_config = {"from_attributes": True}
 
 
@@ -79,7 +79,7 @@ class DoctorUpdate(BaseModel):
     department: Optional[str] = Field(None, max_length=100, description="科室")
     position: Optional[str] = Field(None, max_length=100, description="职位")
     bio: Optional[str] = Field(None, description="个人简介")
-    
+
     @field_validator("phone")
     @classmethod
     def validate_phone(cls, v: Optional[str]) -> Optional[str]:
@@ -100,4 +100,3 @@ class TokenData(BaseModel):
     """Token载荷数据"""
     doctor_id: int
     username: str
-

@@ -45,7 +45,6 @@ AI预问诊对话信息保留了说话人信息，分为AI和User两个，其中
 </answer>
 """
 
-
 TYPE_INFER_PROMPT_TEMPLATE = """
 你是一名经验丰富的中医专家，擅长根据给定的患者病历信息给出对应的证型。
 
@@ -65,7 +64,6 @@ TYPE_INFER_PROMPT_TEMPLATE = """
 
 请你根据患者病历信息，给出对应的证型。
 """
-
 
 PRESCRIPTION_PROMPT_TEMPLATE = """
 你是一位经验丰富的中医专家，专门治疗肥胖患者，擅长辨证论治。
@@ -207,7 +205,6 @@ PRESCRIPTION_PROMPT_TEMPLATE = """
 </answer>
 """
 
-
 EXERCISE_PRESCRIPTION_PROMPT_TEMPLATE = """
 你是一位经验丰富的运动康复专家和中医专家，擅长根据患者的体质和证型，制定个性化的运动处方。
 
@@ -296,4 +293,3 @@ BMI：{bmi}
 [长期运动和生活方式建议]
 </answer>
 """
-

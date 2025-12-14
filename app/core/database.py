@@ -12,7 +12,6 @@ from sqlalchemy.orm import DeclarativeBase
 
 from app.core.config import get_settings
 
-
 settings = get_settings()
 
 # 创建异步引擎
@@ -61,4 +60,3 @@ async def init_db():
 async def close_db():
     """关闭数据库连接"""
     await engine.dispose()
-

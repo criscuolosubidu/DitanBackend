@@ -13,7 +13,7 @@ env:
   TCR_REGISTRY: ccr.ccs.tencentyun.com
   TCR_NAMESPACE: project-ditan
   IMAGE_NAME: ditan-backend
-  
+
 jobs:
   build-and-push:
     name: Build and Push Docker Image

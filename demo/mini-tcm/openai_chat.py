@@ -1,5 +1,6 @@
-import openai
 from typing import List, Dict, Any, Optional, cast
+
+import openai
 from openai.types.chat import (
     ChatCompletionMessageParam,
     ChatCompletionUserMessageParam,
@@ -13,7 +14,7 @@ class OpenAIChatCompletion:
     
     用于方便地调用OpenAI的聊天完成API，支持自定义API密钥、基础URL和模型名称。
     """
-    
+
     def __init__(self, api_key: str, base_url: str, model_name: str):
         """
         初始化OpenAI Chat Completion客户端
@@ -26,14 +27,14 @@ class OpenAIChatCompletion:
         self.api_key = api_key
         self.base_url = base_url
         self.model_name = model_name
-        
+
         # 初始化OpenAI客户端
         self.client = openai.OpenAI(
             api_key=self.api_key,
             base_url=self.base_url
         )
-    
-    def chat(self, messages: List[ChatCompletionMessageParam], 
+
+    def chat(self, messages: List[ChatCompletionMessageParam],
              temperature: float = 0.7,
              max_tokens: Optional[int] = None,
              stream: bool = False,
@@ -64,11 +65,11 @@ class OpenAIChatCompletion:
         except Exception as e:
             print(f"调用OpenAI API时发生错误: {e}")
             raise e
-    
-    def simple_chat(self, user_message: str, 
-                   system_message: Optional[str] = None,
-                   temperature: float = 0.7,
-                   max_tokens: Optional[int] = None) -> str:
+
+    def simple_chat(self, user_message: str,
+                    system_message: Optional[str] = None,
+                    temperature: float = 0.7,
+                    max_tokens: Optional[int] = None) -> str:
         """
         简单的单轮对话方法
         
@@ -82,30 +83,30 @@ class OpenAIChatCompletion:
             str: AI的回复内容
         """
         messages: List[ChatCompletionMessageParam] = []
-        
+
         if system_message:
             messages.append(cast(ChatCompletionSystemMessageParam, {
-                "role": "system", 
+                "role": "system",
                 "content": system_message
             }))
-        
+
         messages.append(cast(ChatCompletionUserMessageParam, {
-            "role": "user", 
+            "role": "user",
             "content": user_message
         }))
-        
+
         response = self.chat(
             messages=messages,
             temperature=temperature,
             max_tokens=max_tokens
         )
-        
+
         return response.choices[0].message.content
-    
-    def stream_chat(self, messages: List[ChatCompletionMessageParam], 
-                   temperature: float = 0.7,
-                   max_tokens: Optional[int] = None,
-                   **kwargs):
+
+    def stream_chat(self, messages: List[ChatCompletionMessageParam],
+                    temperature: float = 0.7,
+                    max_tokens: Optional[int] = None,
+                    **kwargs):
         """
         流式聊天方法
         
@@ -125,11 +126,11 @@ class OpenAIChatCompletion:
             stream=True,
             **kwargs
         )
-        
+
         for chunk in response:
             if chunk.choices[0].delta.content is not None:
                 yield chunk.choices[0].delta.content
-    
+
     def get_model_info(self) -> Dict[str, str]:
         """
         获取当前配置的模型信息

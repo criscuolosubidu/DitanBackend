@@ -1,4 +1,3 @@
-
 MEDICAL_RECORD_PROMPT_TEMPLATE = """
 你是一位精通中医的医学专家，擅长从医患对话的原始转录文本中，提取关键信息并生成结构化的电子病历。
 
@@ -128,7 +127,6 @@ EVALUATION_PRESCRIPTION_PROMPT_TEMPLATE = """
 
 请指出哪个处方更优，并给出详细的理由。若两个处方各有优劣，也请具体说明差异点。
 """
-
 
 PRESCRIPTION_PROMPT_TEMPLATE = """
 你是一位经验丰富的中医专家，专门治疗肥胖患者，擅长辨证论治。
@@ -268,4 +266,4 @@ PRESCRIPTION_PROMPT_TEMPLATE = """
 - ...
 注意，不要遗漏药物，也不要遗漏剂量。
 </answer>
-""" 
+"""

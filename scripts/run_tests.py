@@ -10,7 +10,6 @@ sys.path.insert(0, str(project_root))
 
 import pytest
 
-
 if __name__ == "__main__":
     # 运行测试
     exit_code = pytest.main([
@@ -20,4 +19,3 @@ if __name__ == "__main__":
         "--color=yes",
     ])
     sys.exit(exit_code)
-

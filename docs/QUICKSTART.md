@@ -14,23 +14,23 @@
 DitanBackend 是一个中医智能诊疗系统后端服务，主要功能包括：
 
 1. **医生管理** (v2.0.0新增)
-   - 医生注册和登录
-   - JWT认证保障系统安全
-   - 医生信息管理
+    - 医生注册和登录
+    - JWT认证保障系统安全
+    - 医生信息管理
 
 2. **患者管理**
-   - 患者信息录入
-   - 历史就诊记录查询
+    - 患者信息录入
+    - 历史就诊记录查询
 
 3. **就诊流程管理**
-   - 预诊信息记录
-   - 就诊记录管理
+    - 预诊信息记录
+    - 就诊记录管理
 
 4. **AI辅助诊断**
-   - 自动生成病历
-   - 智能证型判断
-   - 个性化处方生成
-   - 运动处方生成
+    - 自动生成病历
+    - 智能证型判断
+    - 个性化处方生成
+    - 运动处方生成
 
 ## 医生功能快速上手
 
@@ -41,6 +41,7 @@ DitanBackend 是一个中医智能诊疗系统后端服务，主要功能包括�
 **API端点**: `POST /api/v1/doctor/register`
 
 **请求示例**:
+
 ```bash
 curl -X POST "http://localhost:8000/api/v1/doctor/register" \
   -H "Content-Type: application/json" \
@@ -57,6 +58,7 @@ curl -X POST "http://localhost:8000/api/v1/doctor/register" \
 ```
 
 **响应示例**:
+
 ```json
 {
   "success": true,
@@ -78,6 +80,7 @@ curl -X POST "http://localhost:8000/api/v1/doctor/register" \
 ```
 
 **注意事项**:
+
 - 用户名只能包含字母、数字和下划线
 - 密码至少6位
 - 手机号必须是有效的中国大陆手机号（11位，以1开头）
@@ -90,6 +93,7 @@ curl -X POST "http://localhost:8000/api/v1/doctor/register" \
 **API端点**: `POST /api/v1/doctor/login`
 
 **请求示例**:
+
 ```bash
 curl -X POST "http://localhost:8000/api/v1/doctor/login" \
   -H "Content-Type: application/json" \
@@ -100,6 +104,7 @@ curl -X POST "http://localhost:8000/api/v1/doctor/login" \
 ```
 
 **响应示例**:
+
 ```json
 {
   "success": true,
@@ -194,6 +199,7 @@ curl -X GET "http://localhost:8000/api/v1/patient/query?phone=13800138001"
 ```
 
 **响应示例**:
+
 ```json
 {
   "success": true,
@@ -277,6 +283,7 @@ curl -X POST "http://localhost:8000/api/v1/medical-record/1/ai-diagnosis" \
 ```
 
 **AI诊断包含**:
+
 - 格式化的中医病历
 - 证型推断（脾虚湿困型/胃热燔脾型/气滞血瘀型/脾肾阳虚型）
 - 个性化中药处方
@@ -366,6 +373,7 @@ A: 可以。目前所有医生都可以查看所有就诊记录，但创建医�
 ### Q: 如何区分AI诊断和医生诊断？
 
 A: 诊断记录的 `type` 字段标识类型：
+
 - `AI_DIAGNOSIS`: AI诊断
 - `DOCTOR_DIAGNOSIS`: 医生诊断
 
@@ -434,6 +442,7 @@ if __name__ == "__main__":
 ## 获取帮助
 
 如有问题，请查看：
+
 - [README.md](../README.md) - 项目概述和安装指南
 - [API.md](API.md) - 完整的API文档
 - GitHub Issues - 提交问题和建议

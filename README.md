@@ -290,6 +290,7 @@ curl -X POST "http://localhost:8000/api/v1/medical-record/1/ai-diagnosis" \
 ### 响应示例
 
 AI诊断将返回：
+
 - 格式化的病历
 - 证型判断（脾虚湿困型、胃热燔脾型、气滞血瘀型、脾肾阳虚型）
 - 个性化中药处方
@@ -320,6 +321,7 @@ uv run pytest --cov=app --cov-report=html
 当数据库结构变更或需要清空测试数据时，可以使用以下脚本：
 
 **Linux/macOS:**
+
 ```bash
 # 查看帮助
 ./scripts/manage_db.sh help
@@ -338,6 +340,7 @@ uv run pytest --cov=app --cov-report=html
 ```
 
 **Windows:**
+
 ```powershell
 # 查看帮助
 .\scripts\manage_db.ps1 help
@@ -369,6 +372,7 @@ git push
 ### 手动部署脚本
 
 **Linux/macOS:**
+
 ```bash
 # 保留数据库数据（默认）
 ./scripts/deploy.sh
@@ -378,6 +382,7 @@ git push
 ```
 
 **Windows:**
+
 ```powershell
 # 保留数据库数据（默认）
 .\scripts\deploy.ps1
@@ -389,6 +394,7 @@ git push
 ## 核心功能
 
 ### 1. 医生管理（新增）
+
 - 医生账户注册
 - 医生登录（JWT认证）
 - 医生信息查询和更新
@@ -396,43 +402,48 @@ git push
 - 医生诊断记录关联
 
 ### 2. 患者管理
+
 - 二维码扫码注册
 - 手机号查询患者信息
 - 历史就诊记录查询
 
 ### 3. 就诊流程管理
+
 - 创建就诊记录
 - 预诊信息记录（身高、体重、三诊分析）
 - 就诊记录状态管理
 
 ### 4. AI智能诊断
+
 - **病历生成**: 从医患对话ASR转录文本自动生成结构化病历
 - **证型判断**: 基于中医理论智能判断证型
-  - 脾虚湿困型
-  - 胃热燔脾型
-  - 气滞血瘀型
-  - 脾肾阳虚型
+    - 脾虚湿困型
+    - 胃热燔脾型
+    - 气滞血瘀型
+    - 脾肾阳虚型
 - **处方生成**: 根据证型和症状生成个性化中药处方
 - **运动处方**: 根据体质和证型生成4周运动计划
 
 ### 4. 数据验证规则
 
 #### 必填字段
+
 - `phone`: 11位手机号，以1开头（例如：`13800138001`）
 - UUID字段: UUID v4 格式（例如：`550e8400-e29b-41d4-a716-446655440000`）
 
 #### 可选字段
+
 - `name`: 患者姓名
 - `sex`: 性别（"Male", "Female", "Other"）
 - `birthday`: 出生日期（格式：YYYY-MM-DD）
 - `height`: 身高（cm）
 - `weight`: 体重（kg）
 - `sanzhen_analysis`: 三诊分析结果对象
-  - `face`: 面诊结果
-  - `tongue_front`: 舌诊（正面）结果
-  - `tongue_bottom`: 舌诊（舌下）结果
-  - `pulse`: 脉诊结果
-  - `diagnosis_result`: 综合诊断结果
+    - `face`: 面诊结果
+    - `tongue_front`: 舌诊（正面）结果
+    - `tongue_bottom`: 舌诊（舌下）结果
+    - `pulse`: 脉诊结果
+    - `diagnosis_result`: 综合诊断结果
 
 ## 文档
 

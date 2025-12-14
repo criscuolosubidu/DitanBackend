@@ -13,12 +13,11 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
-
 if __name__ == "__main__":
     print(f"启动 {settings.APP_NAME} v{settings.APP_VERSION}")
     print(f"访问地址: http://{settings.APP_HOST}:{settings.APP_PORT}")
     print(f"API 文档: http://{settings.APP_HOST}:{settings.APP_PORT}/docs")
-    
+
     uvicorn.run(
         "main:app",
         host=settings.APP_HOST,
@@ -26,4 +25,3 @@ if __name__ == "__main__":
         reload=True,
         log_level="info",
     )
-
