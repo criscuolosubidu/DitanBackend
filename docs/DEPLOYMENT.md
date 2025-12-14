@@ -24,18 +24,21 @@
 ### 安装 Python 3.11+
 
 **Windows**:
+
 ```bash
 # 从 Python 官网下载并安装
 # https://www.python.org/downloads/
 ```
 
 **Linux (Ubuntu/Debian)**:
+
 ```bash
 sudo apt update
 sudo apt install python3.11 python3.11-dev python3.11-venv
 ```
 
 **macOS**:
+
 ```bash
 brew install python@3.11
 ```
@@ -53,9 +56,11 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ### 安装 PostgreSQL
 
 **Windows**:
+
 - 从官网下载安装程序: https://www.postgresql.org/download/windows/
 
 **Linux (Ubuntu/Debian)**:
+
 ```bash
 sudo apt update
 sudo apt install postgresql postgresql-contrib
@@ -64,6 +69,7 @@ sudo systemctl enable postgresql
 ```
 
 **macOS**:
+
 ```bash
 brew install postgresql@14
 brew services start postgresql@14
@@ -134,17 +140,17 @@ LOG_FILE=logs/app.log           # 日志文件路径
 
 ### 配置项说明
 
-| 配置项 | 说明 | 默认值 | 备注 |
-|--------|------|--------|------|
-| `DATABASE_HOST` | 数据库主机地址 | localhost | 生产环境可能是其他地址 |
-| `DATABASE_PORT` | 数据库端口 | 5432 | PostgreSQL 默认端口 |
-| `DATABASE_USER` | 数据库用户名 | postgres | 根据实际情况修改 |
-| `DATABASE_PASSWORD` | 数据库密码 | your_password | **必须修改** |
-| `DATABASE_NAME` | 数据库名称 | ditan_db | 可自定义 |
-| `APP_HOST` | 服务监听地址 | 0.0.0.0 | 本地开发可用 127.0.0.1 |
-| `APP_PORT` | 服务端口 | 8000 | 可自定义 |
-| `APP_DEBUG` | 调试模式 | False | 生产环境务必设为 False |
-| `LOG_LEVEL` | 日志级别 | INFO | DEBUG/INFO/WARNING/ERROR |
+| 配置项                 | 说明      | 默认值           | 备注                       |
+|---------------------|---------|---------------|--------------------------|
+| `DATABASE_HOST`     | 数据库主机地址 | localhost     | 生产环境可能是其他地址              |
+| `DATABASE_PORT`     | 数据库端口   | 5432          | PostgreSQL 默认端口          |
+| `DATABASE_USER`     | 数据库用户名  | postgres      | 根据实际情况修改                 |
+| `DATABASE_PASSWORD` | 数据库密码   | your_password | **必须修改**                 |
+| `DATABASE_NAME`     | 数据库名称   | ditan_db      | 可自定义                     |
+| `APP_HOST`          | 服务监听地址  | 0.0.0.0       | 本地开发可用 127.0.0.1         |
+| `APP_PORT`          | 服务端口    | 8000          | 可自定义                     |
+| `APP_DEBUG`         | 调试模式    | False         | 生产环境务必设为 False           |
+| `LOG_LEVEL`         | 日志级别    | INFO          | DEBUG/INFO/WARNING/ERROR |
 
 ---
 
@@ -442,6 +448,7 @@ sudo systemctl reload nginx
 **错误信息**: `could not connect to server`
 
 **解决方案**:
+
 1. 检查 PostgreSQL 是否运行：`sudo systemctl status postgresql`
 2. 检查 `.env` 文件中的数据库配置是否正确
 3. 检查防火墙设置
@@ -452,6 +459,7 @@ sudo systemctl reload nginx
 **错误信息**: `Address already in use`
 
 **解决方案**:
+
 ```bash
 # 查找占用端口的进程
 # Linux/macOS
@@ -468,6 +476,7 @@ netstat -ano | findstr :8000
 **错误信息**: `Permission denied: 'logs/app.log'`
 
 **解决方案**:
+
 ```bash
 # 创建日志目录并设置权限
 mkdir -p logs
@@ -477,6 +486,7 @@ chmod 755 logs
 ### 依赖安装失败
 
 **解决方案**:
+
 ```bash
 # 清理并重新安装
 rm -rf .venv uv.lock
@@ -506,8 +516,8 @@ tail -f /var/log/nginx/ditanbackend_error.log
    ```
 
 2. **监控日志文件大小**
-   - 配置日志轮转（logrotate）
-   - 定期清理旧日志
+    - 配置日志轮转（logrotate）
+    - 定期清理旧日志
 
 3. **更新依赖**
    ```bash
@@ -515,23 +525,24 @@ tail -f /var/log/nginx/ditanbackend_error.log
    ```
 
 4. **安全建议**
-   - 使用强密码
-   - 启用防火墙
-   - 使用 HTTPS（配置 SSL 证书）
-   - 定期更新系统和依赖包
-   - 不要在生产环境启用 DEBUG 模式
+    - 使用强密码
+    - 启用防火墙
+    - 使用 HTTPS（配置 SSL 证书）
+    - 定期更新系统和依赖包
+    - 不要在生产环境启用 DEBUG 模式
 
 5. **性能优化**
-   - 根据服务器配置调整 worker 数量
-   - 配置数据库连接池
-   - 使用 CDN 和缓存
-   - 监控服务器资源使用情况
+    - 根据服务器配置调整 worker 数量
+    - 配置数据库连接池
+    - 使用 CDN 和缓存
+    - 监控服务器资源使用情况
 
 ---
 
 ## 联系支持
 
 如有问题，请查看：
+
 - API 文档: [docs/API.md](./API.md)
 - 项目 README: [README.md](../README.md)
 

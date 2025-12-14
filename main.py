@@ -4,15 +4,14 @@ DitanBackend 主应用入口
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, status
-from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 from app.api.router import api_v1_router
 from app.core.config import get_settings
 from app.core.database import init_db, close_db
 from app.core.exceptions import BaseAPIException
 from app.core.logging import LoggerSetup, get_logger, log_error
-
 
 # 初始化日志
 LoggerSetup()
@@ -32,9 +31,9 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         log_error(logger, "数据库初始化失败", e)
         raise
-    
+
     yield
-    
+
     # 关闭时清理资源
     logger.info("正在关闭数据库连接...")
     await close_db()
@@ -50,7 +49,6 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
-
 
 # 注册路由
 app.include_router(api_v1_router)
@@ -84,10 +82,10 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         field = ".".join(str(loc) for loc in error["loc"])
         message = error["msg"]
         error_messages.append(f"{field}: {message}")
-    
+
     error_detail = "; ".join(error_messages)
     log_error(logger, f"请求验证失败: {error_detail}")
-    
+
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         content={
@@ -136,7 +134,7 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     logger.info(f"正在启动 {settings.APP_NAME} v{settings.APP_VERSION}")
     uvicorn.run(
         "main:app",

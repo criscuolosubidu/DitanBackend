@@ -55,9 +55,11 @@ chmod +x scripts/docker_build.sh
 ### 安装 Docker
 
 **Windows:**
+
 - 下载并安装 [Docker Desktop for Windows](https://www.docker.com/products/docker-desktop)
 
 **Linux (Ubuntu/Debian):**
+
 ```bash
 # 安装 Docker
 curl -fsSL https://get.docker.com -o get-docker.sh
@@ -72,6 +74,7 @@ sudo usermod -aG docker $USER
 ```
 
 **macOS:**
+
 - 下载并安装 [Docker Desktop for Mac](https://www.docker.com/products/docker-desktop)
 
 ### 验证安装
@@ -92,23 +95,24 @@ docker-compose --version
 
 ### 可用命令
 
-| 命令 | 说明 |
-|------|------|
-| `init` | 初始化环境（创建 .env 文件和日志目录） |
-| `build` | 构建 Docker 镜像 |
-| `up` | 启动服务（后台运行） |
-| `down` | 停止服务 |
-| `restart` | 重启服务 |
-| `logs` | 查看日志（加 `-f` 参数实时跟踪） |
-| `ps` | 查看服务运行状态 |
-| `dev` | 启动开发环境（支持热重载） |
-| `prod` | 启动生产环境 |
-| `clean` | 清理所有容器、镜像和数据卷 |
-| `help` | 显示帮助信息 |
+| 命令        | 说明                     |
+|-----------|------------------------|
+| `init`    | 初始化环境（创建 .env 文件和日志目录） |
+| `build`   | 构建 Docker 镜像           |
+| `up`      | 启动服务（后台运行）             |
+| `down`    | 停止服务                   |
+| `restart` | 重启服务                   |
+| `logs`    | 查看日志（加 `-f` 参数实时跟踪）    |
+| `ps`      | 查看服务运行状态               |
+| `dev`     | 启动开发环境（支持热重载）          |
+| `prod`    | 启动生产环境                 |
+| `clean`   | 清理所有容器、镜像和数据卷          |
+| `help`    | 显示帮助信息                 |
 
 ### 使用示例
 
 **Windows:**
+
 ```powershell
 # 查看帮助
 .\scripts\docker_build.ps1 help
@@ -130,6 +134,7 @@ docker-compose --version
 ```
 
 **Linux/macOS:**
+
 ```bash
 # 查看帮助
 ./scripts/docker_build.sh help
@@ -229,6 +234,7 @@ LOG_FILE=logs/app.log
 PostgreSQL 数据存储在 Docker 卷 `ditan_postgres_data` 中，即使删除容器数据也不会丢失。
 
 如需清空数据：
+
 ```bash
 docker-compose down -v
 ```
@@ -242,6 +248,7 @@ docker-compose down -v
 **错误信息**: `Bind for 0.0.0.0:8000 failed: port is already allocated`
 
 **解决方案**:
+
 - 修改 `.env` 文件中的 `APP_PORT`
 - 或停止占用端口的程序
 
@@ -250,6 +257,7 @@ docker-compose down -v
 **错误信息**: `could not connect to server`
 
 **解决方案**:
+
 - 检查数据库容器是否正常运行：`docker-compose ps`
 - 查看数据库日志：`docker-compose logs db`
 - 确保应用在数据库启动后才启动（已配置 `depends_on`）
@@ -257,6 +265,7 @@ docker-compose down -v
 ### 3. 镜像构建失败
 
 **解决方案**:
+
 ```bash
 # 清理构建缓存
 docker system prune -a

@@ -12,11 +12,11 @@ generate_jwt_secret.py
 """
 
 import argparse
-import secrets
 import base64
 import os
-import stat
+import secrets
 import sys
+
 
 def generate_secret(nbytes: int, fmt: str) -> str:
     if fmt == "hex":
@@ -29,6 +29,7 @@ def generate_secret(nbytes: int, fmt: str) -> str:
         return base64.b64encode(raw).decode('ascii')
     else:
         raise ValueError("Unsupported format: " + fmt)
+
 
 def safe_write_file(path: str, content: str, make_private: bool = True):
     # Write file (overwrite) and try to set permissions to owner-only on POSIX
@@ -43,6 +44,7 @@ def safe_write_file(path: str, content: str, make_private: bool = True):
     except Exception as e:
         print(f"警告：无法修改文件权限 ({e}). 请手动检查权限。", file=sys.stderr)
 
+
 def append_env_file(path: str, key: str, value: str):
     line = f"{key}={value}\n"
     # If file exists, append; else create
@@ -53,6 +55,7 @@ def append_env_file(path: str, key: str, value: str):
             os.chmod(path, 0o600)
     except Exception as e:
         print(f"警告：无法修改 .env 文件权限 ({e}).", file=sys.stderr)
+
 
 def main():
     p = argparse.ArgumentParser(description="生成强随机 JWT_SECRET_KEY")
@@ -88,6 +91,7 @@ def main():
     print("- 请不要把生成的密钥提交到版本控制（git 等）。")
     print("- 生产环境优先使用专用密钥管理服务（如 Vault、AWS Secrets Manager、Azure Key Vault）。")
     print("- 如果用于生产，请确保密钥至少为 32 bytes（256-bit），更高长度更安全（例如 64 bytes）。")
+
 
 if __name__ == "__main__":
     main()

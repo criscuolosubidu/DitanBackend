@@ -1,10 +1,10 @@
 """
 病人和诊断相关 API 测试
 """
-import pytest
-from datetime import date
-from httpx import AsyncClient
 from unittest.mock import Mock, patch
+
+import pytest
+from httpx import AsyncClient
 
 
 # ========== 患者查询测试 ==========
@@ -27,13 +27,13 @@ async def test_query_patient_success(client: AsyncClient, auth_headers: dict):
             "weight": 70.0
         }
     }
-    
+
     create_response = await client.post("/api/v1/medical-record", json=record_data)
     assert create_response.status_code == 201
-    
+
     # 查询患者 - 需要认证
     response = await client.get("/api/v1/patient/query?phone=13800138001", headers=auth_headers)
-    
+
     assert response.status_code == 200
     data = response.json()
     assert data["success"] is True
@@ -47,7 +47,7 @@ async def test_query_patient_success(client: AsyncClient, auth_headers: dict):
 async def test_query_patient_not_found(client: AsyncClient, auth_headers: dict):
     """测试查询不存在的患者"""
     response = await client.get("/api/v1/patient/query?phone=13800138999", headers=auth_headers)
-    
+
     assert response.status_code == 404
     data = response.json()
     assert data["success"] is False
@@ -58,7 +58,7 @@ async def test_query_patient_not_found(client: AsyncClient, auth_headers: dict):
 async def test_query_patient_unauthorized(client: AsyncClient):
     """测试未认证访问患者查询接口"""
     response = await client.get("/api/v1/patient/query?phone=13800138001")
-    
+
     assert response.status_code == 401
 
 
@@ -88,9 +88,9 @@ async def test_create_medical_record_new_patient(client: AsyncClient):
             }
         }
     }
-    
+
     response = await client.post("/api/v1/medical-record", json=record_data)
-    
+
     assert response.status_code == 201
     data = response.json()
     assert data["success"] is True
@@ -117,10 +117,10 @@ async def test_create_medical_record_existing_patient(client: AsyncClient):
             "weight": 55.0
         }
     }
-    
+
     first_response = await client.post("/api/v1/medical-record", json=first_record_data)
     assert first_response.status_code == 201
-    
+
     # 为现有患者创建第二次就诊记录（不提供patient_info）
     second_record_data = {
         "uuid": "550e8400-e29b-41d4-a716-446655440012",
@@ -131,9 +131,9 @@ async def test_create_medical_record_existing_patient(client: AsyncClient):
             "weight": 54.0
         }
     }
-    
+
     response = await client.post("/api/v1/medical-record", json=second_record_data)
-    
+
     assert response.status_code == 201
     data = response.json()
     assert data["success"] is True
@@ -159,11 +159,11 @@ async def test_create_medical_record_duplicate_uuid(client: AsyncClient):
             "weight": 70.0
         }
     }
-    
+
     # 第一次创建
     response1 = await client.post("/api/v1/medical-record", json=record_data)
     assert response1.status_code == 201
-    
+
     # 第二次创建（重复UUID）
     response2 = await client.post("/api/v1/medical-record", json=record_data)
     assert response2.status_code == 409
@@ -192,14 +192,14 @@ async def test_get_medical_record_success(client: AsyncClient, auth_headers: dic
             "weight": 80.0
         }
     }
-    
+
     create_response = await client.post("/api/v1/medical-record", json=record_data)
     assert create_response.status_code == 201
     record_id = create_response.json()["data"]["record_id"]
-    
+
     # 查询就诊记录 - 需要认证
     response = await client.get(f"/api/v1/medical-record/{record_id}", headers=auth_headers)
-    
+
     assert response.status_code == 200
     data = response.json()
     assert data["success"] is True
@@ -212,7 +212,7 @@ async def test_get_medical_record_success(client: AsyncClient, auth_headers: dic
 async def test_get_medical_record_not_found(client: AsyncClient, auth_headers: dict):
     """测试查询不存在的就诊记录"""
     response = await client.get("/api/v1/medical-record/99999", headers=auth_headers)
-    
+
     assert response.status_code == 404
     data = response.json()
     assert data["success"] is False
@@ -222,7 +222,7 @@ async def test_get_medical_record_not_found(client: AsyncClient, auth_headers: d
 async def test_get_medical_record_unauthorized(client: AsyncClient):
     """测试未认证访问就诊记录"""
     response = await client.get("/api/v1/medical-record/1")
-    
+
     assert response.status_code == 401
 
 
@@ -246,11 +246,11 @@ async def test_create_ai_diagnosis_success(client: AsyncClient, auth_headers: di
             "weight": 85.0
         }
     }
-    
+
     create_response = await client.post("/api/v1/medical-record", json=record_data)
     assert create_response.status_code == 201
     record_id = create_response.json()["data"]["record_id"]
-    
+
     # Mock TCM诊断服务
     mock_diagnosis_result = {
         "overall_status": "success",
@@ -269,23 +269,23 @@ async def test_create_ai_diagnosis_success(client: AsyncClient, auth_headers: di
         },
         "total_processing_time": 10.5
     }
-    
+
     with patch('app.api.patient.get_tcm_service') as mock_service:
         mock_instance = Mock()
         mock_instance.process_complete_diagnosis.return_value = mock_diagnosis_result
         mock_service.return_value = mock_instance
-        
+
         # 创建AI诊断 - 需要认证
         diagnosis_data = {
             "asr_text": "医生：您好，请问有什么不舒服？\n患者：我最近体重增加了很多..."
         }
-        
+
         response = await client.post(
             f"/api/v1/medical-record/{record_id}/ai-diagnosis",
             json=diagnosis_data,
             headers=auth_headers
         )
-        
+
         assert response.status_code == 201
         data = response.json()
         assert data["success"] is True
@@ -304,7 +304,7 @@ AI: 明白了。您能描述一下您的饮食习惯吗？
 User: 我食欲还可以，但吃完饭后经常感觉腹胀。
 AI: 您最近睡眠质量如何？
 User: 睡眠还行，但有时会失眠。"""
-    
+
     record_data = {
         "uuid": "550e8400-e29b-41d4-a716-446655440016",
         "patient_phone": "13800138015",
@@ -321,11 +321,11 @@ User: 睡眠还行，但有时会失眠。"""
             "coze_conversation_log": coze_log
         }
     }
-    
+
     create_response = await client.post("/api/v1/medical-record", json=record_data)
     assert create_response.status_code == 201
     record_id = create_response.json()["data"]["record_id"]
-    
+
     # Mock TCM诊断服务
     mock_diagnosis_result = {
         "overall_status": "success",
@@ -344,34 +344,34 @@ User: 睡眠还行，但有时会失眠。"""
         },
         "total_processing_time": 12.3
     }
-    
+
     with patch('app.api.patient.get_tcm_service') as mock_service:
         mock_instance = Mock()
         mock_instance.process_complete_diagnosis.return_value = mock_diagnosis_result
         mock_service.return_value = mock_instance
-        
+
         # 创建AI诊断
         diagnosis_data = {
             "asr_text": "医生：根据您的预问诊信息，您提到了疲劳和体重增加？\n患者：是的，而且我还觉得肢体有些困重。"
         }
-        
+
         response = await client.post(
             f"/api/v1/medical-record/{record_id}/ai-diagnosis",
             json=diagnosis_data,
             headers=auth_headers
         )
-        
+
         assert response.status_code == 201
         data = response.json()
         assert data["success"] is True
         assert data["data"]["type_inference"] == "脾虚湿困型"
         assert data["data"]["formatted_medical_record"] is not None
         assert data["data"]["prescription"] is not None
-        
+
         # 验证process_complete_diagnosis被调用时传入了正确的参数
         mock_instance.process_complete_diagnosis.assert_called_once()
         call_args = mock_instance.process_complete_diagnosis.call_args
-        
+
         # 验证coze_conversation_log参数被正确传递
         assert call_args.kwargs["coze_conversation_log"] == coze_log
         assert call_args.kwargs["height"] == 165.0
@@ -399,11 +399,11 @@ async def test_create_ai_diagnosis_without_coze_log(client: AsyncClient, auth_he
             # 注意：没有coze_conversation_log字段
         }
     }
-    
+
     create_response = await client.post("/api/v1/medical-record", json=record_data)
     assert create_response.status_code == 201
     record_id = create_response.json()["data"]["record_id"]
-    
+
     # Mock TCM诊断服务
     mock_diagnosis_result = {
         "overall_status": "success",
@@ -422,31 +422,31 @@ async def test_create_ai_diagnosis_without_coze_log(client: AsyncClient, auth_he
         },
         "total_processing_time": 9.8
     }
-    
+
     with patch('app.api.patient.get_tcm_service') as mock_service:
         mock_instance = Mock()
         mock_instance.process_complete_diagnosis.return_value = mock_diagnosis_result
         mock_service.return_value = mock_instance
-        
+
         # 创建AI诊断
         diagnosis_data = {
             "asr_text": "医生：您好，请问有什么不舒服？\n患者：我觉得自己体重太重了，想减肥。"
         }
-        
+
         response = await client.post(
             f"/api/v1/medical-record/{record_id}/ai-diagnosis",
             json=diagnosis_data,
             headers=auth_headers
         )
-        
+
         assert response.status_code == 201
         data = response.json()
         assert data["success"] is True
-        
+
         # 验证process_complete_diagnosis被调用
         mock_instance.process_complete_diagnosis.assert_called_once()
         call_args = mock_instance.process_complete_diagnosis.call_args
-        
+
         # 验证当没有coze_conversation_log时，传入的是None
         assert call_args.kwargs["coze_conversation_log"] is None
         assert call_args.kwargs["height"] == 178.0
@@ -459,13 +459,13 @@ async def test_create_ai_diagnosis_record_not_found(client: AsyncClient, auth_he
     diagnosis_data = {
         "asr_text": "测试对话内容..."
     }
-    
+
     response = await client.post(
         "/api/v1/medical-record/99999/ai-diagnosis",
         json=diagnosis_data,
         headers=auth_headers
     )
-    
+
     assert response.status_code == 404
 
 
@@ -475,12 +475,12 @@ async def test_create_ai_diagnosis_unauthorized(client: AsyncClient):
     diagnosis_data = {
         "asr_text": "测试对话内容..."
     }
-    
+
     response = await client.post(
         "/api/v1/medical-record/1/ai-diagnosis",
         json=diagnosis_data
     )
-    
+
     assert response.status_code == 401
 
 
@@ -489,7 +489,7 @@ async def test_create_ai_diagnosis_unauthorized(client: AsyncClient):
 async def test_health_check(client: AsyncClient):
     """测试健康检查端点"""
     response = await client.get("/health")
-    
+
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "healthy"
@@ -499,9 +499,8 @@ async def test_health_check(client: AsyncClient):
 async def test_root_endpoint(client: AsyncClient):
     """测试根端点"""
     response = await client.get("/")
-    
+
     assert response.status_code == 200
     data = response.json()
     assert "message" in data
     assert "version" in data
-

@@ -71,6 +71,7 @@ sequenceDiagram
 检查应用健康状态。
 
 **响应**
+
 ```json
 {
   "status": "healthy",
@@ -90,6 +91,7 @@ sequenceDiagram
 新医生注册账户。
 
 **请求体**
+
 ```json
 {
   "username": "doctor_zhang",
@@ -104,6 +106,7 @@ sequenceDiagram
 ```
 
 **字段说明**
+
 - `username` (必填): 用户名，3-50位，只能包含字母、数字和下划线
 - `password` (必填): 密码，至少6位
 - `name` (必填): 医生姓名，2-50位
@@ -114,6 +117,7 @@ sequenceDiagram
 - `bio` (可选): 个人简介
 
 **响应示例**
+
 ```json
 {
   "success": true,
@@ -135,6 +139,7 @@ sequenceDiagram
 ```
 
 **错误响应**
+
 - 400: 参数验证失败
 - 409: 用户名或手机号已被注册
 
@@ -147,6 +152,7 @@ sequenceDiagram
 医生使用用户名或手机号和密码登录系统。
 
 **请求体**
+
 ```json
 {
   "username": "doctor_zhang",
@@ -155,6 +161,7 @@ sequenceDiagram
 ```
 
 或者使用手机号登录：
+
 ```json
 {
   "username": "13800138000",
@@ -163,10 +170,12 @@ sequenceDiagram
 ```
 
 **字段说明**
+
 - `username` (必填): 用户名或手机号（支持两种方式）
 - `password` (必填): 密码
 
 **响应示例**
+
 ```json
 {
   "success": true,
@@ -192,6 +201,7 @@ sequenceDiagram
 ```
 
 **错误响应**
+
 - 401: 用户名/手机号或密码错误
 
 ---
@@ -205,11 +215,13 @@ sequenceDiagram
 **认证**: 需要JWT令牌
 
 **请求头**
+
 ```
 Authorization: Bearer <access_token>
 ```
 
 **响应示例**
+
 ```json
 {
   "success": true,
@@ -231,6 +243,7 @@ Authorization: Bearer <access_token>
 ```
 
 **错误响应**
+
 - 401: 未认证或令牌无效
 
 ---
@@ -244,11 +257,13 @@ Authorization: Bearer <access_token>
 **认证**: 需要JWT令牌
 
 **请求头**
+
 ```
 Authorization: Bearer <access_token>
 ```
 
 **请求体**（所有字段都是可选的）
+
 ```json
 {
   "name": "张伟",
@@ -261,6 +276,7 @@ Authorization: Bearer <access_token>
 ```
 
 **响应示例**
+
 ```json
 {
   "success": true,
@@ -282,6 +298,7 @@ Authorization: Bearer <access_token>
 ```
 
 **错误响应**
+
 - 400: 参数验证失败
 - 401: 未认证或令牌无效
 - 409: 手机号已被其他医生使用
@@ -297,11 +314,13 @@ Authorization: Bearer <access_token>
 **认证**: 需要JWT令牌
 
 **请求头**
+
 ```
 Authorization: Bearer <access_token>
 ```
 
 **请求体**
+
 ```json
 {
   "old_password": "password123",
@@ -310,10 +329,12 @@ Authorization: Bearer <access_token>
 ```
 
 **字段说明**
+
 - `old_password` (必填): 旧密码
 - `new_password` (必填): 新密码，至少6位
 
 **响应示例**
+
 ```json
 {
   "success": true,
@@ -323,6 +344,7 @@ Authorization: Bearer <access_token>
 ```
 
 **错误响应**
+
 - 400: 旧密码不正确
 - 401: 未认证或令牌无效
 
@@ -339,14 +361,17 @@ Authorization: Bearer <access_token>
 **认证**: 需要JWT令牌
 
 **请求头**
+
 ```
 Authorization: Bearer <access_token>
 ```
 
 **查询参数**
+
 - `phone` (必填): 患者手机号，11位数字
 
 **响应示例**
+
 ```json
 {
   "success": true,
@@ -374,6 +399,7 @@ Authorization: Bearer <access_token>
 ```
 
 **错误响应**
+
 - 401: 未认证或令牌无效
 - 404: 患者不存在
 
@@ -384,7 +410,7 @@ Authorization: Bearer <access_token>
 **POST** `/api/v1/patient/register` ⚠️ **已废弃（Deprecated）**
 
 > **重要提示：** 此接口已废弃，不再推荐使用。
-> 
+>
 > **推荐做法：**
 > 1. 预就诊系统调用 `POST /api/v1/medical-record` 上传预就诊数据
 > 2. 后端会自动根据手机号查找或创建患者
@@ -398,6 +424,7 @@ Authorization: Bearer <access_token>
 从二维码数据注册新患者。
 
 **请求体**
+
 ```json
 {
   "card_number": "CARD001",
@@ -410,6 +437,7 @@ Authorization: Bearer <access_token>
 ```
 
 **字段说明**
+
 - `card_number` (必填): 会员卡号
 - `name` (必填): 患者姓名
 - `phone` (必填): 手机号，11位数字
@@ -418,6 +446,7 @@ Authorization: Bearer <access_token>
 - `target_weight` (可选): 目标体重
 
 **响应示例**
+
 ```json
 {
   "success": true,
@@ -433,6 +462,7 @@ Authorization: Bearer <access_token>
 ```
 
 **错误响应**
+
 - 400: 参数验证失败
 - 409: 手机号已注册
 
@@ -453,12 +483,14 @@ Authorization: Bearer <access_token>
 **使用场景：** 预就诊系统完成数据采集后，调用此接口上传预就诊记录。
 
 **核心特性：**
+
 - ✅ 自动创建患者：如果患者不存在（根据手机号判断），系统会自动创建
 - ✅ 幂等性保证：使用UUID避免重复创建
 - ✅ 完整数据保存：包括预诊记录、三诊分析结果等
 - ⚠️ 无需认证：供预就诊系统调用，不需要JWT令牌
 
 **请求体**
+
 ```json
 {
   "uuid": "550e8400-e29b-41d4-a716-446655440001",
@@ -486,22 +518,24 @@ Authorization: Bearer <access_token>
 ```
 
 **字段说明**
+
 - `uuid` (必填): 就诊记录UUID，客户端生成
 - `patient_phone` (必填): 患者手机号
 - `patient_info` (可选): 如果患者不存在，需提供患者信息
 - `pre_diagnosis` (必填): 预诊记录
-  - `uuid` (必填): 预诊记录UUID
-  - `height` (可选): 身高(cm)
-  - `weight` (可选): 体重(kg)
-  - `coze_conversation_log` (可选): 与数字人的对话记录
-  - `sanzhen_analysis` (可选): 三诊分析结果
-    - `face`: 面诊结果
-    - `tongue_front`: 舌诊正面
-    - `tongue_bottom`: 舌诊舌下
-    - `pulse`: 脉诊结果
-    - `diagnosis_result`: 综合诊断结果
+    - `uuid` (必填): 预诊记录UUID
+    - `height` (可选): 身高(cm)
+    - `weight` (可选): 体重(kg)
+    - `coze_conversation_log` (可选): 与数字人的对话记录
+    - `sanzhen_analysis` (可选): 三诊分析结果
+        - `face`: 面诊结果
+        - `tongue_front`: 舌诊正面
+        - `tongue_bottom`: 舌诊舌下
+        - `pulse`: 脉诊结果
+        - `diagnosis_result`: 综合诊断结果
 
 **响应示例**
+
 ```json
 {
   "success": true,
@@ -543,6 +577,7 @@ Authorization: Bearer <access_token>
 ```
 
 **错误响应**
+
 - 400: 参数验证失败，或患者不存在且未提供患者信息
 - 409: 就诊记录UUID已存在
 
@@ -557,14 +592,17 @@ Authorization: Bearer <access_token>
 **认证**: 需要JWT令牌
 
 **请求头**
+
 ```
 Authorization: Bearer <access_token>
 ```
 
 **路径参数**
+
 - `record_id`: 就诊记录ID
 
 **响应示例**
+
 ```json
 {
   "success": true,
@@ -620,6 +658,7 @@ Authorization: Bearer <access_token>
 ```
 
 **错误响应**
+
 - 401: 未认证或令牌无效
 - 404: 就诊记录不存在
 
@@ -636,14 +675,17 @@ Authorization: Bearer <access_token>
 **认证**: 需要JWT令牌
 
 **请求头**
+
 ```
 Authorization: Bearer <access_token>
 ```
 
 **路径参数**
+
 - `record_id`: 就诊记录ID
 
 **请求体**
+
 ```json
 {
   "asr_text": "医生：您好，请问有什么不舒服？\n患者：我最近体重增加了很多，感觉身体很沉重，容易疲劳..."
@@ -651,9 +693,11 @@ Authorization: Bearer <access_token>
 ```
 
 **字段说明**
+
 - `asr_text` (必填): ASR转录的医患对话文本
 
 **响应示例**
+
 ```json
 {
   "success": true,
@@ -677,12 +721,14 @@ Authorization: Bearer <access_token>
 ```
 
 **AI诊断流程**
+
 1. **病历生成**: 从ASR对话文本中提取关键信息，生成结构化病历
 2. **证型判断**: 根据病历信息判断中医证型（脾虚湿困型、胃热燔脾型、气滞血瘀型、脾肾阳虚型）
 3. **处方生成**: 根据证型和患者具体症状生成个性化中药处方
 4. **运动处方**: 根据证型、体质和BMI生成4周运动计划
 
 **错误响应**
+
 - 401: 未认证或令牌无效
 - 404: 就诊记录不存在
 - 500: AI诊断失败
@@ -714,6 +760,7 @@ Authorization: Bearer <access_token>
 ## 数据模型
 
 ### Gender 枚举
+
 ```
 MALE - 男性
 FEMALE - 女性
@@ -721,12 +768,14 @@ OTHER - 其他
 ```
 
 ### DiagnosisType 枚举
+
 ```
 AI_DIAGNOSIS - AI诊断
 DOCTOR_DIAGNOSIS - 医生诊断
 ```
 
 ### 就诊记录状态
+
 ```
 pending - 待处理
 in_progress - 处理中
@@ -832,11 +881,11 @@ Authorization: Bearer <access_token>
 
 ## 注意事项
 
-1. **认证要求**: 
-   - 医生端的所有查询和诊断接口都需要JWT认证
-   - 医生需要先调用登录接口获取 `access_token`
-   - 在后续请求中需要在请求头携带：`Authorization: Bearer <access_token>`
-   - 预就诊系统的上传接口（`POST /medical-record`）不需要认证
+1. **认证要求**:
+    - 医生端的所有查询和诊断接口都需要JWT认证
+    - 医生需要先调用登录接口获取 `access_token`
+    - 在后续请求中需要在请求头携带：`Authorization: Bearer <access_token>`
+    - 预就诊系统的上传接口（`POST /medical-record`）不需要认证
 2. **令牌有效期**: JWT令牌默认有效期为24小时，过期后需要重新登录
 3. **UUID生成**: 客户端需要生成UUID（v4格式）用于就诊记录和预诊记录
 4. **手机号格式**: 必须是11位数字，以1开头
@@ -894,6 +943,7 @@ JWT_ACCESS_TOKEN_EXPIRE_MINUTES=1440  # 24小时
 ## 更新日志
 
 ### v2.1.0 (2024-01-20)
+
 - 🔒 为患者查询、就诊记录查询和AI诊断接口添加医生认证
 - 🔒 医生端所有API接口（除预就诊上传）现在需要JWT令牌认证
 - 📝 更新API文档，明确标注哪些接口需要认证
@@ -901,6 +951,7 @@ JWT_ACCESS_TOKEN_EXPIRE_MINUTES=1440  # 24小时
 - 🎯 优化工作流程说明，明确医生登录步骤
 
 ### v2.0.0 (2024-01-15)
+
 - 新增医生管理功能
 - 新增医生注册和登录功能
 - 新增JWT认证机制
@@ -908,6 +959,7 @@ JWT_ACCESS_TOKEN_EXPIRE_MINUTES=1440  # 24小时
 - 更新DoctorDiagnosisRecord关联到Doctor实体
 
 ### v1.0.0 (2024-01-01)
+
 - 实现患者管理功能
 - 实现就诊记录管理
 - 集成AI诊断引擎

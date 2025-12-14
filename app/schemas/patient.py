@@ -32,7 +32,7 @@ class QRcodeRecord(BaseModel):
     gender: Gender = Field(..., description="性别")
     birthday: date = Field(..., description="出生日期")
     target_weight: Optional[str] = Field(None, description="目标体重")
-    
+
     @field_validator("phone")
     @classmethod
     def validate_phone(cls, v: str) -> str:
@@ -49,7 +49,7 @@ class PatientCreate(BaseModel):
     sex: Gender = Field(..., description="性别")
     birthday: date = Field(..., description="出生日期")
     phone: str = Field(..., description="手机号")
-    
+
     @field_validator("phone")
     @classmethod
     def validate_phone(cls, v: str) -> str:
@@ -66,7 +66,7 @@ class PatientResponse(BaseModel):
     sex: Gender
     birthday: date
     phone: str
-    
+
     model_config = {"from_attributes": True}
 
 
@@ -88,7 +88,7 @@ class SanzhenAnalysisResponse(BaseModel):
     tongue_bottom: Optional[str] = None
     pulse: Optional[str] = None
     diagnosis_result: Optional[str] = None
-    
+
     model_config = {"from_attributes": True}
 
 
@@ -100,7 +100,7 @@ class PreDiagnosisCreate(BaseModel):
     weight: Optional[float] = Field(None, description="体重(kg)")
     coze_conversation_log: Optional[str] = Field(None, description="对话记录")
     sanzhen_analysis: Optional[SanzhenAnalysisCreate] = Field(None, description="三诊分析结果")
-    
+
     @field_validator("uuid")
     @classmethod
     def validate_uuid(cls, v: str) -> str:
@@ -125,7 +125,7 @@ class PreDiagnosisResponse(BaseModel):
     sanzhen_result: Optional[SanzhenAnalysisResponse] = None
     created_at: datetime
     updated_at: datetime
-    
+
     model_config = {"from_attributes": True}
 
 
@@ -136,7 +136,7 @@ class MedicalRecordCreate(BaseModel):
     patient_phone: str = Field(..., description="患者手机号")
     patient_info: Optional[PatientCreate] = Field(None, description="患者信息（如果是新患者）")
     pre_diagnosis: PreDiagnosisCreate = Field(..., description="预诊记录")
-    
+
     @field_validator("uuid")
     @classmethod
     def validate_uuid(cls, v: str) -> str:
@@ -148,7 +148,7 @@ class MedicalRecordCreate(BaseModel):
         if not uuid_pattern.match(v):
             raise ValueError("UUID 格式不正确")
         return v
-    
+
     @field_validator("patient_phone")
     @classmethod
     def validate_phone(cls, v: str) -> str:
@@ -168,7 +168,7 @@ class MedicalRecordResponse(BaseModel):
     updated_at: datetime
     patient: PatientResponse
     pre_diagnosis: Optional[PreDiagnosisResponse] = None
-    
+
     model_config = {"from_attributes": True}
 
 
@@ -180,7 +180,7 @@ class MedicalRecordListItem(BaseModel):
     created_at: datetime
     patient_name: str
     patient_phone: str
-    
+
     model_config = {"from_attributes": True}
 
 
@@ -209,7 +209,7 @@ class AIDiagnosisResponse(DiagnosisRecordBase):
     model_name: Optional[str] = None
     created_at: datetime
     updated_at: datetime
-    
+
     model_config = {"from_attributes": True}
 
 
@@ -251,7 +251,7 @@ class DoctorDiagnosisResponse(DiagnosisRecordBase):
     comments: Optional[str] = None
     created_at: datetime
     updated_at: datetime
-    
+
     model_config = {"from_attributes": True}
 
 
@@ -266,7 +266,7 @@ class CompleteMedicalRecordResponse(BaseModel):
     patient: PatientResponse
     pre_diagnosis: Optional[PreDiagnosisResponse] = None
     diagnoses: List[AIDiagnosisResponse | DoctorDiagnosisResponse] = Field(default_factory=list)
-    
+
     model_config = {"from_attributes": True}
 
 
@@ -290,5 +290,5 @@ class PatientQueryResponse(BaseModel):
     """患者查询响应"""
     patient: PatientResponse
     medical_records: List[MedicalRecordListItem] = Field(default_factory=list, description="历史就诊记录")
-    
+
     model_config = {"from_attributes": True}
