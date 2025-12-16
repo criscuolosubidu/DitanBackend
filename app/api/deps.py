@@ -1,6 +1,4 @@
 """API 依赖注入"""
-from typing import Callable
-
 from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
