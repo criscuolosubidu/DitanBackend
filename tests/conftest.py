@@ -1,6 +1,18 @@
 """测试配置"""
 import asyncio
+import os
 from typing import AsyncGenerator
+
+# 设置测试环境变量（必须在导入app之前）
+os.environ.setdefault("DATABASE_HOST", "localhost")
+os.environ.setdefault("DATABASE_PORT", "5432")
+os.environ.setdefault("DATABASE_USER", "test")
+os.environ.setdefault("DATABASE_PASSWORD", "test")
+os.environ.setdefault("DATABASE_NAME", "test")
+os.environ.setdefault("AI_API_KEY", "test-api-key")
+os.environ.setdefault("AI_BASE_URL", "https://api.test.com")
+os.environ.setdefault("AI_MODEL_NAME", "test-model")
+os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key")
 
 import pytest
 from httpx import AsyncClient, ASGITransport

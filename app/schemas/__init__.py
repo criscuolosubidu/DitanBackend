@@ -33,6 +33,15 @@ from app.schemas.doctor import (
     PasswordChange,
     TokenData,
 )
+from app.schemas.chat import (
+    ChatMessageCreate,
+    ChatMessageResponse,
+    ConversationCreate,
+    ConversationResponse,
+    ConversationDetailResponse,
+    ChatRequest,
+    ChatStreamRequest,
+)
 
 __all__ = [
     "Gender",
@@ -63,4 +72,12 @@ __all__ = [
     "DoctorUpdate",
     "PasswordChange",
     "TokenData",
+    # Chat schemas
+    "ChatMessageCreate",
+    "ChatMessageResponse",
+    "ConversationCreate",
+    "ConversationResponse",
+    "ConversationDetailResponse",
+    "ChatRequest",
+    "ChatStreamRequest",
 ]

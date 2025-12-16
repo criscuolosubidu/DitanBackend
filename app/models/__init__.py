@@ -10,6 +10,11 @@ from app.models.medical import (
     AIDiagnosisRecord,
     DoctorDiagnosisRecord,
 )
+from app.models.chat import (
+    MessageRole,
+    ChatConversation,
+    ChatMessage,
+)
 
 __all__ = [
     "Gender",
@@ -23,4 +28,8 @@ __all__ = [
     "DiagnosisRecord",
     "AIDiagnosisRecord",
     "DoctorDiagnosisRecord",
+    # Chat models
+    "MessageRole",
+    "ChatConversation",
+    "ChatMessage",
 ]
