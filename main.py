@@ -1,29 +1,29 @@
-"""
-DitanBackend 主应用入口
-"""
+"""DitanBackend 主应用入口"""
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from app.api.router import api_v1_router
-from app.core.config import get_settings
-from app.core.database import init_db, close_db
-from app.core.exceptions import BaseAPIException
-from app.core.logging import LoggerSetup, get_logger, log_error
+from app.api import api_v1_router
+from app.core import (
+    get_settings,
+    init_db,
+    close_db,
+    LoggerSetup,
+    get_logger,
+    log_error,
+    BaseAPIException,
+)
 
-# 初始化日志
 LoggerSetup()
 logger = get_logger(__name__)
-
 settings = get_settings()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
-    # 启动时初始化数据库
     logger.info("正在初始化数据库...")
     try:
         await init_db()
@@ -34,13 +34,11 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # 关闭时清理资源
     logger.info("正在关闭数据库连接...")
     await close_db()
     logger.info("应用已关闭")
 
 
-# 创建 FastAPI 应用
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
@@ -50,19 +48,13 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# 注册路由
 app.include_router(api_v1_router)
 
 
-# 全局异常处理
 @app.exception_handler(BaseAPIException)
-async def base_api_exception_handler(request: Request, exc: BaseAPIException):
+async def api_exception_handler(request: Request, exc: BaseAPIException):
     """处理自定义 API 异常"""
-    log_error(
-        logger,
-        f"API 异常: {exc.message}",
-        exc if settings.APP_DEBUG else None
-    )
+    log_error(logger, f"API 异常: {exc.message}", exc if settings.APP_DEBUG else None)
     return JSONResponse(
         status_code=exc.status_code,
         content={
@@ -77,17 +69,12 @@ async def base_api_exception_handler(request: Request, exc: BaseAPIException):
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """处理请求验证异常"""
     errors = exc.errors()
-    error_messages = []
-    for error in errors:
-        field = ".".join(str(loc) for loc in error["loc"])
-        message = error["msg"]
-        error_messages.append(f"{field}: {message}")
-
+    error_messages = [f"{'.'.join(str(loc) for loc in e['loc'])}: {e['msg']}" for e in errors]
     error_detail = "; ".join(error_messages)
-    log_error(logger, f"请求验证失败: {error_detail}")
 
+    log_error(logger, f"请求验证失败: {error_detail}")
     return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={
             "success": False,
             "message": "请求参数验证失败",
@@ -110,7 +97,6 @@ async def general_exception_handler(request: Request, exc: Exception):
     )
 
 
-# 健康检查端点
 @app.get("/health", tags=["健康检查"])
 async def health_check():
     """健康检查"""
@@ -121,7 +107,6 @@ async def health_check():
     }
 
 
-# 根端点
 @app.get("/", tags=["根路径"])
 async def root():
     """根路径"""

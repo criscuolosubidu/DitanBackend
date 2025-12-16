@@ -1,6 +1,4 @@
-"""
-测试配置
-"""
+"""测试配置"""
 import asyncio
 from typing import AsyncGenerator
 
@@ -8,26 +6,14 @@ import pytest
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 
-from app.core.auth import hash_password, create_access_token
-from app.core.database import Base, get_db
-from app.models.patient import Doctor
+from app.core import hash_password, create_access_token, get_db, Base
+from app.models import Doctor
 from main import app
 
-# 测试数据库 URL（使用内存数据库或独立测试数据库）
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
-# 创建测试引擎
-test_engine = create_async_engine(
-    TEST_DATABASE_URL,
-    echo=False,
-)
-
-# 创建测试会话工厂
-test_session_maker = async_sessionmaker(
-    test_engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-)
+test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+test_session_maker = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
 
 
 @pytest.fixture(scope="session")
@@ -41,15 +27,12 @@ def event_loop():
 @pytest.fixture(scope="function")
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """创建测试数据库会话"""
-    # 创建所有表
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    # 创建会话
     async with test_session_maker() as session:
         yield session
 
-    # 清理所有表
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
@@ -75,12 +58,7 @@ async def test_doctor(db_session: AsyncSession) -> Doctor:
 @pytest.fixture(scope="function")
 def auth_token(test_doctor: Doctor) -> str:
     """创建测试认证令牌"""
-    return create_access_token(
-        data={
-            "doctor_id": test_doctor.doctor_id,
-            "username": test_doctor.username
-        }
-    )
+    return create_access_token(data={"doctor_id": test_doctor.doctor_id, "username": test_doctor.username})
 
 
 @pytest.fixture(scope="function")

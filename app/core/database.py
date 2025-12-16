@@ -1,20 +1,13 @@
-"""
-数据库连接模块
-"""
+"""数据库连接模块"""
 from typing import AsyncGenerator
 
-from sqlalchemy.ext.asyncio import (
-    AsyncSession,
-    async_sessionmaker,
-    create_async_engine,
-)
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
 from app.core.config import get_settings
 
 settings = get_settings()
 
-# 创建异步引擎
 engine = create_async_engine(
     settings.database_url,
     echo=settings.APP_DEBUG,
@@ -23,7 +16,6 @@ engine = create_async_engine(
     max_overflow=20,
 )
 
-# 创建会话工厂
 async_session_maker = async_sessionmaker(
     engine,
     class_=AsyncSession,
@@ -52,7 +44,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_db():
-    """初始化数据库（创建所有表）"""
+    """初始化数据库"""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 

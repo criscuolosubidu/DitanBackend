@@ -1,10 +1,8 @@
-"""
-日志配置模块
-"""
+"""日志配置模块"""
 import logging
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from app.core.config import get_settings
 
@@ -12,41 +10,32 @@ from app.core.config import get_settings
 class LoggerSetup:
     """日志设置类"""
 
+    _initialized = False
+
     def __init__(self):
-        self.settings = get_settings()
-        self._setup_logger()
+        if not LoggerSetup._initialized:
+            self._setup_logger()
+            LoggerSetup._initialized = True
 
     def _setup_logger(self):
-        """配置日志"""
-        # 创建日志目录
-        log_file = Path(self.settings.LOG_FILE)
+        settings = get_settings()
+
+        log_file = Path(settings.LOG_FILE)
         log_file.parent.mkdir(parents=True, exist_ok=True)
 
-        # 配置日志格式
-        log_format = (
-            "%(asctime)s - %(name)s - %(levelname)s - "
-            "[%(filename)s:%(lineno)d] - %(message)s"
-        )
+        log_format = "%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s"
         date_format = "%Y-%m-%d %H:%M:%S"
 
-        # 配置根日志记录器
         logging.basicConfig(
-            level=getattr(logging, self.settings.LOG_LEVEL),
+            level=getattr(logging, settings.LOG_LEVEL),
             format=log_format,
             datefmt=date_format,
             handlers=[
-                # 控制台处理器
                 logging.StreamHandler(sys.stdout),
-                # 文件处理器
-                logging.FileHandler(
-                    log_file,
-                    encoding="utf-8",
-                    mode="a"
-                )
-            ]
+                logging.FileHandler(log_file, encoding="utf-8", mode="a"),
+            ],
         )
 
-        # 设置第三方库日志级别
         logging.getLogger("uvicorn").setLevel(logging.INFO)
         logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
 
@@ -56,21 +45,25 @@ def get_logger(name: str) -> logging.Logger:
     return logging.getLogger(name)
 
 
-def log_request(logger: logging.Logger, endpoint: str, data: Any):
+def log_request(logger: logging.Logger, endpoint: str, data: Any = None):
     """记录请求日志"""
-    logger.info(f"请求端点: {endpoint}")
-    logger.info(f"请求参数: {data}")
+    if data:
+        logger.info(f"请求 {endpoint}: {data}")
+    else:
+        logger.info(f"请求 {endpoint}")
 
 
-def log_response(logger: logging.Logger, endpoint: str, data: Any):
+def log_response(logger: logging.Logger, endpoint: str, data: Any = None):
     """记录响应日志"""
-    logger.info(f"响应端点: {endpoint}")
-    logger.info(f"响应数据: {data}")
+    if data:
+        logger.debug(f"响应 {endpoint}: {data}")
+    else:
+        logger.debug(f"响应 {endpoint}")
 
 
-def log_error(logger: logging.Logger, error_msg: str, exc: Exception = None):
+def log_error(logger: logging.Logger, message: str, exc: Optional[Exception] = None):
     """记录错误日志"""
     if exc:
-        logger.error(f"{error_msg}: {str(exc)}")
+        logger.error(f"{message}: {exc}", exc_info=True)
     else:
-        logger.error(error_msg)
+        logger.error(message)

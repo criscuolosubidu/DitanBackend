@@ -1,3 +1,66 @@
-"""
-Pydantic 模型（请求/响应）
-"""
+"""Schema 模块导出"""
+from app.schemas.common import (
+    Gender,
+    DiagnosisType,
+    APIResponse,
+    ErrorResponse,
+)
+from app.schemas.patient import (
+    PatientCreate,
+    PatientResponse,
+    SanzhenAnalysisCreate,
+    SanzhenAnalysisResponse,
+    PreDiagnosisCreate,
+    PreDiagnosisResponse,
+    MedicalRecordCreate,
+    MedicalRecordResponse,
+    MedicalRecordListItem,
+    DiagnosisRecordBase,
+    AIDiagnosisCreate,
+    AIDiagnosisResponse,
+    DoctorDiagnosisCreate,
+    DoctorDiagnosisUpdate,
+    DoctorDiagnosisResponse,
+    CompleteMedicalRecordResponse,
+    PatientQueryResponse,
+)
+from app.schemas.doctor import (
+    DoctorRegister,
+    DoctorLogin,
+    DoctorResponse,
+    LoginResponse,
+    DoctorUpdate,
+    PasswordChange,
+    TokenData,
+)
+
+__all__ = [
+    "Gender",
+    "DiagnosisType",
+    "APIResponse",
+    "ErrorResponse",
+    "PatientCreate",
+    "PatientResponse",
+    "SanzhenAnalysisCreate",
+    "SanzhenAnalysisResponse",
+    "PreDiagnosisCreate",
+    "PreDiagnosisResponse",
+    "MedicalRecordCreate",
+    "MedicalRecordResponse",
+    "MedicalRecordListItem",
+    "DiagnosisRecordBase",
+    "AIDiagnosisCreate",
+    "AIDiagnosisResponse",
+    "DoctorDiagnosisCreate",
+    "DoctorDiagnosisUpdate",
+    "DoctorDiagnosisResponse",
+    "CompleteMedicalRecordResponse",
+    "PatientQueryResponse",
+    "DoctorRegister",
+    "DoctorLogin",
+    "DoctorResponse",
+    "LoginResponse",
+    "DoctorUpdate",
+    "PasswordChange",
+    "TokenData",
+]

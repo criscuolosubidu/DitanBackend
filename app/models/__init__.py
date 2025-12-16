@@ -1,3 +1,26 @@
-"""
-数据库模型
-"""
+"""数据库模型导出"""
+from app.models.enums import Gender, DiagnosisType, MedicalRecordStatus
+from app.models.doctor import Doctor
+from app.models.medical import (
+    Patient,
+    PatientMedicalRecord,
+    PreDiagnosisRecord,
+    SanzhenAnalysisResult,
+    DiagnosisRecord,
+    AIDiagnosisRecord,
+    DoctorDiagnosisRecord,
+)
+
+__all__ = [
+    "Gender",
+    "DiagnosisType",
+    "MedicalRecordStatus",
+    "Doctor",
+    "Patient",
+    "PatientMedicalRecord",
+    "PreDiagnosisRecord",
+    "SanzhenAnalysisResult",
+    "DiagnosisRecord",
+    "AIDiagnosisRecord",
+    "DoctorDiagnosisRecord",
+]
