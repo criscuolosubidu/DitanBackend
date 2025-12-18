@@ -152,8 +152,11 @@ async def create_medical_record(
             sanzhen = SanzhenAnalysisResult(
                 pre_diagnosis_id=pre_diagnosis.pre_diagnosis_id,
                 face=record_data.pre_diagnosis.sanzhen_analysis.face,
+                face_image_url=record_data.pre_diagnosis.sanzhen_analysis.face_image_url,
                 tongue_front=record_data.pre_diagnosis.sanzhen_analysis.tongue_front,
+                tongue_front_image_url=record_data.pre_diagnosis.sanzhen_analysis.tongue_front_image_url,
                 tongue_bottom=record_data.pre_diagnosis.sanzhen_analysis.tongue_bottom,
+                tongue_bottom_image_url=record_data.pre_diagnosis.sanzhen_analysis.tongue_bottom_image_url,
                 pulse=record_data.pre_diagnosis.sanzhen_analysis.pulse,
                 diagnosis_result=record_data.pre_diagnosis.sanzhen_analysis.diagnosis_result,
             )

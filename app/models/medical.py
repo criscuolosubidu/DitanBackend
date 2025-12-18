@@ -107,8 +107,11 @@ class SanzhenAnalysisResult(Base):
         nullable=False, unique=True, index=True
     )
     face: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    face_image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     tongue_front: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    tongue_front_image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     tongue_bottom: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    tongue_bottom_image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     pulse: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     diagnosis_result: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
 

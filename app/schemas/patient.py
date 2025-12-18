@@ -41,8 +41,11 @@ class PatientResponse(BaseModel):
 class SanzhenAnalysisCreate(BaseModel):
     """三诊分析结果创建"""
     face: Optional[str] = Field(None, description="面诊结果")
+    face_image_url: Optional[str] = Field(None, description="面诊图片URL")
     tongue_front: Optional[str] = Field(None, description="舌诊正面结果")
+    tongue_front_image_url: Optional[str] = Field(None, description="舌诊正面图片URL")
     tongue_bottom: Optional[str] = Field(None, description="舌诊舌下结果")
+    tongue_bottom_image_url: Optional[str] = Field(None, description="舌诊舌下图片URL")
     pulse: Optional[str] = Field(None, description="脉诊结果")
     diagnosis_result: Optional[str] = Field(None, description="综合诊断结果")
 
@@ -51,8 +54,11 @@ class SanzhenAnalysisResponse(BaseModel):
     """三诊分析结果响应"""
     sanzhen_id: int
     face: Optional[str] = None
+    face_image_url: Optional[str] = None
     tongue_front: Optional[str] = None
+    tongue_front_image_url: Optional[str] = None
     tongue_bottom: Optional[str] = None
+    tongue_bottom_image_url: Optional[str] = None
     pulse: Optional[str] = None
     diagnosis_result: Optional[str] = None
 
