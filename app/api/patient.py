@@ -339,85 +339,93 @@ async def create_ai_diagnosis_stream(
     ctx: RequestContext = Depends(get_auth_context),
 ):
     """为就诊记录生成AI诊断（流式返回）"""
-    ctx.log_info(f"流式AI诊断: record_id={record_id}")
+    try:
+        ctx.log_info(f"流式AI诊断: record_id={record_id}")
 
-    result = await ctx.db.execute(
-        select(PatientMedicalRecord)
-        .options(selectinload(PatientMedicalRecord.pre_diagnosis))
-        .where(PatientMedicalRecord.record_id == record_id)
-    )
-    medical_record = result.scalar_one_or_none()
+        result = await ctx.db.execute(
+            select(PatientMedicalRecord)
+            .options(selectinload(PatientMedicalRecord.pre_diagnosis))
+            .where(PatientMedicalRecord.record_id == record_id)
+        )
+        medical_record = result.scalar_one_or_none()
 
-    if not medical_record:
-        raise NotFoundException(f"未找到就诊记录 ID: {record_id}")
+        if not medical_record:
+            ctx.log_error(f"未找到就诊记录 ID: {record_id}")
+            raise NotFoundException(f"未找到就诊记录 ID: {record_id}")
 
-    height, weight, coze_conversation_log = None, None, None
-    if medical_record.pre_diagnosis:
-        height = medical_record.pre_diagnosis.height
-        weight = medical_record.pre_diagnosis.weight
-        coze_conversation_log = medical_record.pre_diagnosis.coze_conversation_log
+        height, weight, coze_conversation_log = None, None, None
+        if medical_record.pre_diagnosis:
+            height = medical_record.pre_diagnosis.height
+            weight = medical_record.pre_diagnosis.weight
+            coze_conversation_log = medical_record.pre_diagnosis.coze_conversation_log
 
-    diagnosis_result_holder = {"data": None}
+        diagnosis_result_holder = {"data": None}
 
-    async def generate_stream():
-        tcm_service = get_tcm_service()
-        try:
-            async for event_data in tcm_service.stream_complete_diagnosis(
-                transcript=diagnosis_data.asr_text,
-                height=height,
-                weight=weight,
-                coze_conversation_log=coze_conversation_log,
-            ):
-                yield event_data
-                if event_data.startswith("event: complete"):
-                    lines = event_data.strip().split("\n")
-                    for line in lines:
-                        if line.startswith("data: "):
-                            diagnosis_result_holder["data"] = json.loads(line[6:])
-                            break
-        except Exception as e:
-            ctx.log_error("流式诊断出错", e)
-            yield f"event: error\ndata: {json.dumps({'message': str(e)}, ensure_ascii=False)}\n\n"
-
-    async def stream_and_save():
-        async for event_data in generate_stream():
-            yield event_data
-
-        if diagnosis_result_holder["data"] and diagnosis_result_holder["data"].get("status") == "success":
+        async def generate_stream():
+            tcm_service = get_tcm_service()
             try:
-                final_result = diagnosis_result_holder["data"]
-                ai_diagnosis = AIDiagnosisRecord(
-                    record_id=record_id,
-                    formatted_medical_record=final_result.get("formatted_medical_record"),
-                    type_inference=final_result.get("type_inference"),
-                    prescription=final_result.get("prescription"),
-                    exercise_prescription=final_result.get("exercise_prescription"),
-                    diagnosis_explanation=final_result.get("diagnosis_explanation"),
-                    response_time=final_result.get("total_processing_time"),
-                    model_name=settings.AI_MODEL_NAME,
-                )
-
-                ctx.db.add(ai_diagnosis)
-                medical_record.status = "completed"
-                await ctx.db.commit()
-                await ctx.db.refresh(ai_diagnosis)
-
-                ctx.log_info(f"流式AI诊断保存成功: diagnosis_id={ai_diagnosis.diagnosis_id}")
-                yield f"event: saved\ndata: {json.dumps({'diagnosis_id': ai_diagnosis.diagnosis_id, 'message': '诊断记录已保存'}, ensure_ascii=False)}\n\n"
-
+                async for event_data in tcm_service.stream_complete_diagnosis(
+                    transcript=diagnosis_data.asr_text,
+                    height=height,
+                    weight=weight,
+                    coze_conversation_log=coze_conversation_log,
+                ):
+                    yield event_data
+                    if event_data.startswith("event: complete"):
+                        lines = event_data.strip().split("\n")
+                        for line in lines:
+                            if line.startswith("data: "):
+                                diagnosis_result_holder["data"] = json.loads(line[6:])
+                                break
             except Exception as e:
-                ctx.log_error("保存诊断记录失败", e)
-                yield f"event: save_error\ndata: {json.dumps({'message': f'保存诊断记录失败: {str(e)}'}, ensure_ascii=False)}\n\n"
+                ctx.log_error("流式诊断出错", e)
+                yield f"event: error\ndata: {json.dumps({'message': str(e)}, ensure_ascii=False)}\n\n"
 
-    return StreamingResponse(
-        stream_and_save(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
+        async def stream_and_save():
+            async for event_data in generate_stream():
+                yield event_data
+
+            if diagnosis_result_holder["data"] and diagnosis_result_holder["data"].get("status") == "success":
+                try:
+                    final_result = diagnosis_result_holder["data"]
+                    ai_diagnosis = AIDiagnosisRecord(
+                        record_id=record_id,
+                        formatted_medical_record=final_result.get("formatted_medical_record"),
+                        type_inference=final_result.get("type_inference"),
+                        prescription=final_result.get("prescription"),
+                        exercise_prescription=final_result.get("exercise_prescription"),
+                        diagnosis_explanation=final_result.get("diagnosis_explanation"),
+                        response_time=final_result.get("total_processing_time"),
+                        model_name=settings.AI_MODEL_NAME,
+                    )
+
+                    ctx.db.add(ai_diagnosis)
+                    medical_record.status = "completed"
+                    await ctx.db.commit()
+                    await ctx.db.refresh(ai_diagnosis)
+
+                    ctx.log_info(f"流式AI诊断保存成功: diagnosis_id={ai_diagnosis.diagnosis_id}")
+                    yield f"event: saved\ndata: {json.dumps({'diagnosis_id': ai_diagnosis.diagnosis_id, 'message': '诊断记录已保存'}, ensure_ascii=False)}\n\n"
+
+                except Exception as e:
+                    ctx.log_error("保存诊断记录失败", e)
+                    yield f"event: save_error\ndata: {json.dumps({'message': f'保存诊断记录失败: {str(e)}'}, ensure_ascii=False)}\n\n"
+
+        return StreamingResponse(
+            stream_and_save(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
+
+    except NotFoundException:
+        raise
+    except Exception as e:
+        ctx.log_error("流式AI诊断失败", e)
+        raise DatabaseException("生成流式AI诊断时发生错误", str(e))
 
 
 @router.post("/medical-record/{record_id}/doctor-diagnosis", response_model=APIResponse, status_code=201)

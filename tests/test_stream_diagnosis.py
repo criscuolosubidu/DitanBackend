@@ -150,7 +150,7 @@ async def manual_test_stream_diagnosis():
     import httpx
 
     # ============ 配置参数 ============
-    BASE_URL = "http://localhost:8000"  # 修改为你的服务器地址
+    BASE_URL = "http://localhost:8001"  # 修改为你的服务器地址
 
     # 医生登录信息（请根据实际情况修改）
     DOCTOR_USERNAME = "doctor_zhang"

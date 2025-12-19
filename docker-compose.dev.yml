@@ -1,0 +1,60 @@
+services:
+  db:
+    image: ${IMAGE_REGISTRY:-docker.huanyufuture.top}/postgres:17
+    container_name: ditan_db_dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME:-ditan}
+      POSTGRES_USER: ${DATABASE_USER:-huanyu}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-Huanyu2020yyds!}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    ports:
+      - "${DATABASE_PORT:-5432}:5432"
+    networks:
+      - ditan_network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${DATABASE_USER:-huanyu} -d ${DATABASE_NAME:-ditan}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 应用服务 (开启本地构建模式)
+  app:
+    build:
+      context: .           # 指定当前目录为构建上下文
+      dockerfile: Dockerfile # 指定 Dockerfile 文件名
+    image: ditan-backend:dev # 构建后的本地镜像名称
+    container_name: ditan_backend_dev
+    restart: always
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    environment:
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+      DATABASE_USER: ${DATABASE_USER:-huanyu}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-Huanyu2020yyds!}
+      DATABASE_NAME: ${DATABASE_NAME:-ditan}
+      APP_NAME: ${APP_NAME:-DitanBackend-Dev}
+      APP_VERSION: ${APP_VERSION:-0.2.0-dev}
+      APP_DEBUG: "True"    # 开发环境建议开启 Debug
+      AI_API_KEY: ${AI_API_KEY}
+      AI_BASE_URL: ${AI_BASE_URL}
+      AI_MODEL_NAME: ${AI_MODEL_NAME:-deepseek-chat}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - .:/app             # 重要：将本地源码实时映射到容器，方便调试
+      - ./logs:/app/logs
+    networks:
+      - ditan_network
+
+volumes:
+  postgres_dev_data:       # 使用独立的 volume，避免污染生产环境数据
+
+networks:
+  ditan_network:
+    driver: bridge
