@@ -4,7 +4,7 @@ import json
 from fastapi import APIRouter, Depends, Query, Path
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, with_polymorphic
 
 from app.api.deps import RequestContext, get_request_context, get_auth_context
 from app.core import get_settings
@@ -14,6 +14,7 @@ from app.models import (
     PatientMedicalRecord,
     PreDiagnosisRecord,
     SanzhenAnalysisResult,
+    DiagnosisRecord,
     AIDiagnosisRecord,
     DoctorDiagnosisRecord,
     DiagnosisType,
@@ -190,12 +191,17 @@ async def get_medical_record(
     try:
         ctx.log_info(f"查询就诊记录: record_id={record_id}")
 
+        # 使用 with_polymorphic 预加载多态子类的所有列，避免异步懒加载问题
+        DiagnosisPolymorphic = with_polymorphic(
+            DiagnosisRecord, [AIDiagnosisRecord, DoctorDiagnosisRecord]
+        )
+
         result = await ctx.db.execute(
             select(PatientMedicalRecord)
             .options(
                 selectinload(PatientMedicalRecord.patient),
                 selectinload(PatientMedicalRecord.pre_diagnosis).selectinload(PreDiagnosisRecord.sanzhen_result),
-                selectinload(PatientMedicalRecord.diagnoses),
+                selectinload(PatientMedicalRecord.diagnoses.of_type(DiagnosisPolymorphic)),
             )
             .where(PatientMedicalRecord.record_id == record_id)
         )
