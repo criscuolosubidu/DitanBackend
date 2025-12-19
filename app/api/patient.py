@@ -4,7 +4,7 @@ import json
 from fastapi import APIRouter, Depends, Query, Path
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload, with_polymorphic
+from sqlalchemy.orm import selectinload
 
 from app.api.deps import RequestContext, get_request_context, get_auth_context
 from app.core import get_settings
@@ -14,7 +14,6 @@ from app.models import (
     PatientMedicalRecord,
     PreDiagnosisRecord,
     SanzhenAnalysisResult,
-    DiagnosisRecord,
     AIDiagnosisRecord,
     DoctorDiagnosisRecord,
     DiagnosisType,
@@ -26,6 +25,7 @@ from app.schemas.patient import (
     MedicalRecordCreate,
     MedicalRecordResponse,
     MedicalRecordListItem,
+    PreDiagnosisResponse,
     CompleteMedicalRecordResponse,
     AIDiagnosisCreate,
     AIDiagnosisResponse,
@@ -191,17 +191,12 @@ async def get_medical_record(
     try:
         ctx.log_info(f"查询就诊记录: record_id={record_id}")
 
-        # 使用 with_polymorphic 预加载多态子类的所有列，避免异步懒加载问题
-        DiagnosisPolymorphic = with_polymorphic(
-            DiagnosisRecord, [AIDiagnosisRecord, DoctorDiagnosisRecord]
-        )
-
+        # 加载医疗记录基本信息（不加载多态诊断记录，避免懒加载问题）
         result = await ctx.db.execute(
             select(PatientMedicalRecord)
             .options(
                 selectinload(PatientMedicalRecord.patient),
                 selectinload(PatientMedicalRecord.pre_diagnosis).selectinload(PreDiagnosisRecord.sanzhen_result),
-                selectinload(PatientMedicalRecord.diagnoses.of_type(DiagnosisPolymorphic)),
             )
             .where(PatientMedicalRecord.record_id == record_id)
         )
@@ -210,11 +205,57 @@ async def get_medical_record(
         if not medical_record:
             raise NotFoundException(f"未找到就诊记录 ID: {record_id}")
 
+        # 分别查询不同类型的诊断记录，避免多态继承的懒加载问题
+        ai_diagnoses_result = await ctx.db.execute(
+            select(AIDiagnosisRecord).where(AIDiagnosisRecord.record_id == record_id)
+        )
+        ai_diagnoses = ai_diagnoses_result.scalars().all()
+
+        doctor_diagnoses_result = await ctx.db.execute(
+            select(DoctorDiagnosisRecord)
+            .options(selectinload(DoctorDiagnosisRecord.doctor))
+            .where(DoctorDiagnosisRecord.record_id == record_id)
+        )
+        doctor_diagnoses = doctor_diagnoses_result.scalars().all()
+
+        # 构建诊断列表
+        diagnoses_list = []
+        for d in ai_diagnoses:
+            diagnoses_list.append(AIDiagnosisResponse.model_validate(d).model_dump())
+        for d in doctor_diagnoses:
+            diagnoses_list.append(DoctorDiagnosisResponse(
+                diagnosis_id=d.diagnosis_id,
+                record_id=d.record_id,
+                type=d.type,
+                doctor_id=d.doctor_id,
+                doctor_name=d.doctor.name if d.doctor else None,
+                formatted_medical_record=d.formatted_medical_record,
+                type_inference=d.type_inference,
+                treatment=d.treatment,
+                prescription=d.prescription,
+                exercise_prescription=d.exercise_prescription,
+                comments=d.comments,
+                created_at=d.created_at,
+                updated_at=d.updated_at,
+            ).model_dump())
+
+        # 按创建时间排序
+        diagnoses_list.sort(key=lambda x: x["created_at"])
+
         ctx.log_info(f"查询成功: record_id={record_id}")
         return APIResponse(
             success=True,
             message="就诊记录查询成功",
-            data=CompleteMedicalRecordResponse.model_validate(medical_record).model_dump(),
+            data={
+                "record_id": medical_record.record_id,
+                "uuid": medical_record.uuid,
+                "status": medical_record.status,
+                "created_at": medical_record.created_at.isoformat(),
+                "updated_at": medical_record.updated_at.isoformat(),
+                "patient": PatientResponse.model_validate(medical_record.patient).model_dump(),
+                "pre_diagnosis": PreDiagnosisResponse.model_validate(medical_record.pre_diagnosis).model_dump() if medical_record.pre_diagnosis else None,
+                "diagnoses": diagnoses_list,
+            },
         )
 
     except NotFoundException:
